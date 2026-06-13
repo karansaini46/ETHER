@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 
+import { HUD } from '@/components/HUD/HUD'
 import { Galaxy } from '@/three/Galaxy'
 
 function App() {
@@ -27,6 +28,7 @@ function App() {
         aria-hidden="true"
       />
       <h1 className="sr-only">ETHER</h1>
+      <HUD />
     </main>
   )
 }

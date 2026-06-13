@@ -3,9 +3,11 @@
 @tailwind utilities;
 
 :root {
+  --font-label: 'Space Grotesk', system-ui, sans-serif;
+  --font-data: 'JetBrains Mono', ui-monospace, monospace;
   color: #f8fafc;
   background: #020408;
-  font-family: 'Space Grotesk', system-ui, sans-serif;
+  font-family: var(--font-label);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -33,4 +35,19 @@ button,
 input,
 textarea {
   font: inherit;
+}
+
+.glass-panel {
+  border: 1px solid rgba(30, 45, 61, 0.8);
+  background: rgba(5, 13, 20, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.font-label {
+  font-family: var(--font-label);
+}
+
+.font-data {
+  font-family: var(--font-data);
 }
