@@ -1,0 +1,15 @@
+node_modules
+dist
+.env
+.git
+.gitignore
+*.md
+Dockerfile
+.dockerignore
+.eslintrc.js
+eslint.config.js
+postcss.config.js
+tailwind.config.ts
+tsconfig.app.json
+tsconfig.node.json
+vite.config.ts
