@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useExplorerStore } from '@/stores/explorer';
 import { Network, Folder, FolderClosed, Layers } from 'lucide-react';
+import { FileList } from './FileList';
 
 export function ConstellationNav() {
   const graph = useExplorerStore((s) => s.graph);
@@ -56,9 +57,12 @@ export function ConstellationNav() {
             );
           })}
         </div>
+
+        <FileList />
       </div>
     </div>
   );
 }
+
 export default ConstellationNav;
 

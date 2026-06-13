@@ -21,6 +21,10 @@ interface ExplorerState {
 
   // Selection
   selectedNode: GraphNode | null;
+  hoveredNode: GraphNode | null;
+  focusedNode: GraphNode | null;
+  dependencyMode: 'all' | 'incoming' | 'outgoing' | 'impact';
+  previousCameraState: { position: [number, number, number]; target: [number, number, number] } | null;
   highlightedNodes: Set<string>;
   highlightedEdges: Set<string>;
   isolatedCluster: string | null;
@@ -36,6 +40,10 @@ interface ExplorerState {
   setAnalysisStatus: (stage: AnalysisStage | 'idle', progress: number, message: string, error?: string) => void;
   setGraph: (graph: GraphData | null, isDemo?: boolean) => void;
   selectNode: (node: GraphNode | null) => void;
+  setHoveredNode: (node: GraphNode | null) => void;
+  setFocusedNode: (node: GraphNode | null) => void;
+  setDependencyMode: (mode: 'all' | 'incoming' | 'outgoing' | 'impact') => void;
+  setPreviousCameraState: (state: { position: [number, number, number]; target: [number, number, number] } | null) => void;
   highlightNodes: (ids: string[]) => void;
   highlightEdges: (keys: string[]) => void;
   clearHighlights: () => void;
@@ -57,6 +65,10 @@ const initialState = {
   graph: null,
   isDemo: false,
   selectedNode: null,
+  hoveredNode: null,
+  focusedNode: null,
+  dependencyMode: 'all' as const,
+  previousCameraState: null,
   highlightedNodes: new Set<string>(),
   highlightedEdges: new Set<string>(),
   isolatedCluster: null,
@@ -74,6 +86,10 @@ export const useExplorerStore = create<ExplorerState>()((set) => ({
     set({ analysisStage: stage, analysisProgress: progress, analysisMessage: message, analysisError: error ?? null }),
   setGraph: (graph, isDemo = false) => set({ graph, isDemo }),
   selectNode: (node) => set({ selectedNode: node }),
+  setHoveredNode: (node) => set({ hoveredNode: node }),
+  setFocusedNode: (node) => set({ focusedNode: node }),
+  setDependencyMode: (mode) => set({ dependencyMode: mode }),
+  setPreviousCameraState: (state) => set({ previousCameraState: state }),
   highlightNodes: (ids) => set({ highlightedNodes: new Set(ids) }),
   highlightEdges: (keys) => set({ highlightedEdges: new Set(keys) }),
   clearHighlights: () => set({ highlightedNodes: new Set(), highlightedEdges: new Set() }),

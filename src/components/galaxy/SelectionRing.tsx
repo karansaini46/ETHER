@@ -22,7 +22,7 @@ export function SelectionRing() {
   return (
     <mesh ref={meshRef} position={[x, y, z]}>
       <torusGeometry args={[size * 1.5, 0.05, 8, 24]} />
-      <meshBasicMaterial color="#00d4ff" wireframe />
+      <meshBasicMaterial color="#C56A3A" wireframe />
     </mesh>
   );
 }
