@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useExplorerStore } from './explorer.js';
-import type { GraphNode } from '@/types/graph';
+import type { GraphNode, GraphData } from '@/types/graph';
 
 const mockNode: GraphNode = {
   id: 'src/main.tsx',
@@ -20,6 +20,18 @@ const mockNode: GraphNode = {
   riskLevel: 'low',
   importCount: 1,
   importedByCount: 1,
+};
+
+const mockGraphData: GraphData = {
+  nodes: [mockNode],
+  edges: [],
+  repoName: 'test-repo',
+  repoOwner: 'test-owner',
+  defaultBranch: 'main',
+  totalFiles: 1,
+  analyzedFiles: 1,
+  languages: { 'TypeScript': 1 },
+  fetchedAt: Date.now(),
 };
 
 describe('explorer Zustand store', () => {
@@ -52,11 +64,7 @@ describe('explorer Zustand store', () => {
   });
 
   it('should update selectedNode and clear highlighted structures', () => {
-    // Mock the graph map setup
-    useExplorerStore.getState().setGraph({
-      nodes: [mockNode],
-      edges: [],
-    });
+    useExplorerStore.getState().setGraph(mockGraphData);
 
     useExplorerStore.getState().selectNode(mockNode);
     expect(useExplorerStore.getState().selectedNode).toEqual(mockNode);
@@ -70,11 +78,11 @@ describe('explorer Zustand store', () => {
   });
 
   it('should resolve node by path with normalization', () => {
-    const graphData = {
+    const graphData: GraphData = {
+      ...mockGraphData,
       nodes: [
         { ...mockNode, id: 'src/components/Button.tsx', label: 'Button' }
-      ],
-      edges: []
+      ]
     };
     useExplorerStore.getState().setGraph(graphData);
 

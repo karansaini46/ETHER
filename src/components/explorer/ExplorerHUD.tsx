@@ -22,7 +22,6 @@ export function ExplorerHUD() {
   const setRenderingOpen = useExplorerStore((s) => s.setRenderingOpen);
   const clustersOpen = useExplorerStore((s) => s.clustersOpen);
   const setClustersOpen = useExplorerStore((s) => s.setClustersOpen);
-  const searchOpen = useExplorerStore((s) => s.searchOpen);
   const setSearchOpen = useExplorerStore((s) => s.setSearchOpen);
 
   const [isMobile, setIsMobile] = useState(false);

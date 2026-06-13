@@ -244,7 +244,7 @@ export const useExplorerStore = create<ExplorerState>()((set) => ({
   clearHighlights: () => set({ highlightedNodes: new Set(), highlightedEdges: new Set() }),
   isolateCluster: (folder) => set({ isolatedCluster: folder }),
 
-  setInspectorOpen: (open) => set((s) => {
+  setInspectorOpen: (open) => set(() => {
     const updates: Partial<ExplorerState> = { inspectorOpen: open };
     if (open) {
       const w = typeof window !== 'undefined' ? window.innerWidth : 1200;
@@ -259,7 +259,7 @@ export const useExplorerStore = create<ExplorerState>()((set) => ({
     return updates;
   }),
 
-  setRenderingOpen: (open) => set((s) => {
+  setRenderingOpen: (open) => set(() => {
     const updates: Partial<ExplorerState> = { renderingOpen: open };
     if (open) {
       const w = typeof window !== 'undefined' ? window.innerWidth : 1200;
@@ -274,7 +274,7 @@ export const useExplorerStore = create<ExplorerState>()((set) => ({
     return updates;
   }),
 
-  setClustersOpen: (open) => set((s) => {
+  setClustersOpen: (open) => set(() => {
     const updates: Partial<ExplorerState> = { clustersOpen: open };
     if (open) {
       const w = typeof window !== 'undefined' ? window.innerWidth : 1200;
