@@ -5,13 +5,12 @@ import type {
   GraphWorkerInput,
   GraphWorkerOutput,
 } from '@/types/graph'
+import GraphWorker from './graph.worker.ts?worker'
 
 export async function buildGraphInWorker(
   input: GraphWorkerInput,
 ): Promise<GraphWorkerOutput> {
-  const worker = new Worker(new URL('./graph.worker.ts', import.meta.url), {
-    type: 'module',
-  })
+  const worker = new GraphWorker()
   const graphWorker = wrap<GraphWorkerApi>(worker)
 
   try {

@@ -2,7 +2,6 @@ import { useEffect, useRef } from 'react'
 
 import { HUD } from '@/components/HUD/HUD'
 import { fetchCommits, fetchFileContent, fetchIssues, fetchRepoTree } from '@/lib/github'
-import { buildGraph } from '@/lib/graph'
 import { buildGraphInWorker } from '@/lib/workers/graph'
 import { useStore } from '@/store'
 import { Galaxy } from '@/three/Galaxy'
@@ -88,16 +87,12 @@ function App() {
         actions.setStatus('computing-graph')
         let graphData
 
-        if (files.length > 200) {
-          graphData = await buildGraphInWorker({
-            files,
-            contents,
-            commits,
-            issues,
-          })
-        } else {
-          graphData = buildGraph(files, contents, commits, issues)
-        }
+        graphData = await buildGraphInWorker({
+          files,
+          contents,
+          commits,
+          issues,
+        })
 
         actions.setGraph(graphData)
         // Phase 4: ready

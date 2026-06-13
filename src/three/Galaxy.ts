@@ -10,16 +10,17 @@ import {
   InstancedMesh,
   LineBasicMaterial,
   LineSegments,
+  Material,
   Matrix4,
   Mesh,
   MeshBasicMaterial,
   PerspectiveCamera,
   PlaneGeometry,
+  Points,
   PointLight,
   Scene,
   ShaderMaterial,
   TorusGeometry,
-  Material,
   Vector2,
   Vector3,
   WebGLRenderer,
@@ -63,6 +64,15 @@ interface LabelRecord {
   element: HTMLDivElement
 }
 
+interface NodeLODMapping {
+  node: GraphNode
+  mesh: InstancedMesh
+  meshIndex: number
+  pointIndex: number
+  scale: number
+  color: Color
+}
+
 const BUG_GLOW_VERTEX_SHADER = `
   varying vec2 vUv;
   void main() {
@@ -82,6 +92,27 @@ const BUG_GLOW_FRAGMENT_SHADER = `
     float pulse = 0.6 + 0.4 * sin(uTime * 6.28);
     
     gl_FragColor = vec4(1.0, 0.18, 0.33, alpha * pulse * 0.75);
+  }
+`
+
+const LOD_POINTS_VERTEX_SHADER = `
+  attribute float size;
+  varying vec3 vColor;
+  void main() {
+    vColor = color;
+    vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+    gl_PointSize = size * (300.0 / -mvPosition.z);
+    gl_Position = projectionMatrix * mvPosition;
+  }
+`
+
+const LOD_POINTS_FRAGMENT_SHADER = `
+  varying vec3 vColor;
+  void main() {
+    float dist = distance(gl_PointCoord, vec2(0.5));
+    if (dist > 0.5) discard;
+    float alpha = smoothstep(0.5, 0.1, dist);
+    gl_FragColor = vec4(vColor, alpha * 0.85);
   }
 `
 
@@ -108,6 +139,17 @@ export class Galaxy {
   private readonly cameraWorldPosition = new Vector3()
   private readonly labelWorldPosition = new Vector3()
   private readonly storeUnsubscribers: Array<() => void> = []
+
+  // LOD resources
+  private readonly nodeMappings: NodeLODMapping[] = []
+  private lodPointsGeometry?: BufferGeometry
+  private lodPointsMesh?: Points
+
+  // Performance overlay resources
+  private perfElement?: HTMLDivElement
+  private frameCount = 0
+  private lastPerfUpdateTime = 0
+
   private animationFrameId = 0
   private previousFrameTime = 0
   private disposed = false
@@ -164,6 +206,33 @@ export class Galaxy {
       0.3, // threshold
     )
     this.composer.addPass(bloomPass)
+
+    // Performance overlay (dev-only)
+    if (import.meta.env.DEV) {
+      this.perfElement = document.createElement('div')
+      this.perfElement.className = 'perf-overlay'
+      Object.assign(this.perfElement.style, {
+        position: 'absolute',
+        top: '20px',
+        right: '20px',
+        backgroundColor: 'rgba(0,0,0,0.85)',
+        border: '1px solid #00d4ff',
+        borderRadius: '8px',
+        padding: '10px 14px',
+        color: '#00d4ff',
+        fontFamily: 'JetBrains Mono, monospace',
+        fontSize: '11px',
+        lineHeight: '1.4',
+        zIndex: '1000',
+        pointerEvents: 'none',
+      })
+
+      const perfObject = new CSS2DObject(this.perfElement)
+      // Position it in front of camera
+      perfObject.position.set(2, 1.5, -5)
+      this.camera.add(perfObject)
+      this.scene.add(this.camera)
+    }
 
     this.labelRenderer = new CSS2DRenderer()
     this.labelRenderer.domElement.className = 'galaxy-label-layer'
@@ -230,6 +299,50 @@ export class Galaxy {
 
     this.clearGraph()
 
+    // 1. Build LOD Points representation
+    const positions = new Float32Array(data.nodes.length * 3)
+    const colors = new Float32Array(data.nodes.length * 3)
+    const sizes = new Float32Array(data.nodes.length)
+
+    data.nodes.forEach((node, i) => {
+      positions[i * 3] = node.position[0]
+      positions[i * 3 + 1] = node.position[1]
+      positions[i * 3 + 2] = node.position[2]
+
+      const color = getNodeColor(node.type, node.hasIssue)
+      colors[i * 3] = color.r
+      colors[i * 3 + 1] = color.g
+      colors[i * 3 + 2] = color.b
+
+      sizes[i] = 0.0 // Initially invisible, updated by LOD check
+    })
+
+    this.lodPointsGeometry = new BufferGeometry()
+    this.lodPointsGeometry.setAttribute(
+      'position',
+      new Float32BufferAttribute(positions, 3),
+    )
+    this.lodPointsGeometry.setAttribute(
+      'color',
+      new Float32BufferAttribute(colors, 3),
+    )
+    this.lodPointsGeometry.setAttribute(
+      'size',
+      new Float32BufferAttribute(sizes, 1),
+    )
+
+    const pointsMaterial = new ShaderMaterial({
+      vertexShader: LOD_POINTS_VERTEX_SHADER,
+      fragmentShader: LOD_POINTS_FRAGMENT_SHADER,
+      transparent: true,
+      depthWrite: false,
+      blending: AdditiveBlending,
+    })
+
+    this.lodPointsMesh = new Points(this.lodPointsGeometry, pointsMaterial)
+    this.graphRoot.add(this.lodPointsMesh)
+
+    // 2. Build Instanced Sphere representation
     const nodesByType = new Map<NodeType, GraphNode[]>(
       NODE_TYPES.map((type) => [type, []]),
     )
@@ -240,7 +353,6 @@ export class Galaxy {
 
       if (node.isRecent) {
         this.createRecentLight(node)
-        // Trigger supernova burst on loading recent node
         const pos = new Vector3().fromArray(node.position)
         const col = getNodeColor(node.type, node.hasIssue)
         this.particles.burst(pos, col, 80)
@@ -255,7 +367,7 @@ export class Galaxy {
       const nodes = nodesByType.get(type) ?? []
 
       if (nodes.length > 0) {
-        this.createNodeInstances(type, nodes)
+        this.createNodeInstances(type, nodes, data.nodes)
       }
     }
 
@@ -283,6 +395,10 @@ export class Galaxy {
       unsubscribe()
     }
     this.storeUnsubscribers.length = 0
+
+    if (this.perfElement) {
+      this.perfElement.remove()
+    }
 
     this.nodeRaycaster.dispose()
     this.cameraRig.dispose()
@@ -350,7 +466,6 @@ export class Galaxy {
     this.previousFrameTime = time
     this.cameraRig.update(delta)
 
-    // Update particles
     this.particles.update(delta)
 
     const pulse = 0.12 + (Math.sin(time * 0.004) + 1) * 0.08
@@ -360,7 +475,6 @@ export class Galaxy {
       light.intensity = 0.35 + (Math.sin(time * 0.004) + 1) * 0.12
     }
 
-    // Update bug glows to face camera and pulse uTime uniform
     for (const glow of this.bugGlowMeshes) {
       glow.quaternion.copy(this.camera.quaternion)
       if (glow.material instanceof ShaderMaterial) {
@@ -368,7 +482,6 @@ export class Galaxy {
       }
     }
 
-    // Rotate and scale selected node torus ring
     const selectedNode = useStore.getState().selectedNode
     if (selectedNode) {
       this.selectedRing.visible = true
@@ -380,13 +493,82 @@ export class Galaxy {
       this.selectedRing.visible = false
     }
 
+    this.updateLOD()
     this.updateHighlightedStars()
     this.updateLabelVisibility()
 
-    // Render using post processing composer instead of renderer
+    if (import.meta.env.DEV) {
+      this.updatePerfOverlay(time)
+    }
+
     this.composer.render()
     this.labelRenderer.render(this.scene, this.camera)
     this.animationFrameId = requestAnimationFrame(this.animate)
+  }
+
+  private updateLOD(): void {
+    if (this.nodeMappings.length === 0 || !this.lodPointsGeometry) {
+      return
+    }
+
+    this.camera.getWorldPosition(this.cameraWorldPosition)
+
+    const sizesAttribute = this.lodPointsGeometry.getAttribute(
+      'size',
+    ) as Float32BufferAttribute
+    const sizes = sizesAttribute.array as Float32Array
+
+    const matrix = new Matrix4()
+    const position = new Vector3()
+    const scale = new Vector3()
+
+    let pointsNeedUpdate = false
+    const meshesToUpdate = new Set<InstancedMesh>()
+
+    for (const mapping of this.nodeMappings) {
+      const {
+        node,
+        mesh,
+        meshIndex,
+        pointIndex,
+        scale: nodeScale,
+      } = mapping
+      position.fromArray(node.position)
+
+      const distance = position.distanceTo(this.cameraWorldPosition)
+
+      if (distance <= 150) {
+        // LOD 0 (Close): Sphere Mesh
+        scale.setScalar(nodeScale)
+        matrix.compose(position, mesh.quaternion, scale)
+        mesh.setMatrixAt(meshIndex, matrix)
+        meshesToUpdate.add(mesh)
+
+        if (sizes[pointIndex] !== 0.0) {
+          sizes[pointIndex] = 0.0
+          pointsNeedUpdate = true
+        }
+      } else {
+        // LOD 1 (Distant): Simple Point
+        matrix.makeScale(0, 0, 0)
+        mesh.setMatrixAt(meshIndex, matrix)
+        meshesToUpdate.add(mesh)
+
+        const targetSize = 1.5 + nodeScale * 2.0
+        if (sizes[pointIndex] !== targetSize) {
+          sizes[pointIndex] = targetSize
+          pointsNeedUpdate = true
+        }
+      }
+    }
+
+    for (const mesh of meshesToUpdate) {
+      mesh.instanceMatrix.needsUpdate = true
+    }
+
+    if (pointsNeedUpdate) {
+      sizesAttribute.needsUpdate = true
+    }
   }
 
   private updateHighlightedStars(): void {
@@ -418,7 +600,11 @@ export class Galaxy {
     }
   }
 
-  private createNodeInstances(type: NodeType, nodes: GraphNode[]): void {
+  private createNodeInstances(
+    type: NodeType,
+    nodes: GraphNode[],
+    allNodes: GraphNode[],
+  ): void {
     const geometry = new IcosahedronGeometry(1, 2)
     const recentFlags = new Float32Array(nodes.length)
     const highlightedFlags = new Float32Array(nodes.length)
@@ -451,6 +637,18 @@ export class Galaxy {
       mesh.setColorAt(index, getNodeColor(type, node.hasIssue))
       recentFlags[index] = node.isRecent ? 1 : 0
       highlightedFlags[index] = 0
+
+      // Map node index to global points array
+      const globalIndex = allNodes.findIndex((n) => n.id === node.id)
+
+      this.nodeMappings.push({
+        node,
+        mesh,
+        meshIndex: index,
+        pointIndex: globalIndex,
+        scale: nodeScale,
+        color: getNodeColor(type, node.hasIssue),
+      })
     })
 
     mesh.instanceMatrix.needsUpdate = true
@@ -551,7 +749,8 @@ export class Galaxy {
     label.position.fromArray(node.position)
     label.center.set(0.5, -0.8)
     this.labels.push({ object: label, element })
-    this.graphRoot.add(label)
+    // NOTE: CSS2DObject is NOT added to scene graph immediately;
+    // handled dynamically by updateLabelVisibility inside render loop.
   }
 
   private createRecentLight(node: GraphNode): void {
@@ -590,12 +789,47 @@ export class Galaxy {
     this.camera.getWorldPosition(this.cameraWorldPosition)
 
     for (const { object, element } of this.labels) {
-      object.getWorldPosition(this.labelWorldPosition)
-      const visible =
-        this.labelWorldPosition.distanceTo(this.cameraWorldPosition) <=
-        LABEL_DISTANCE
-      object.visible = visible
-      element.hidden = !visible
+      this.labelWorldPosition.copy(object.position)
+      const distance =
+        this.labelWorldPosition.distanceTo(this.cameraWorldPosition)
+      const isClose = distance <= LABEL_DISTANCE
+
+      if (isClose) {
+        if (object.parent === null) {
+          this.graphRoot.add(object)
+        }
+        element.hidden = false
+      } else {
+        if (object.parent !== null) {
+          this.graphRoot.remove(object)
+        }
+        element.hidden = true
+      }
+    }
+  }
+
+  private updatePerfOverlay(time: number): void {
+    if (!this.perfElement) {
+      return
+    }
+
+    this.frameCount++
+    const elapsed = time - this.lastPerfUpdateTime
+
+    if (elapsed >= 1000) {
+      const fps = Math.round((this.frameCount * 1000) / elapsed)
+      const drawCalls = this.renderer.info.render.calls
+      const triangles = this.renderer.info.render.triangles
+
+      this.perfElement.innerHTML = `
+        <div style="font-weight:bold;margin-bottom:4px;color:#e2e8f0;">ETHER PERF</div>
+        <div>FPS: <span style="color:#ffffff;">${fps}</span></div>
+        <div>Draw Calls: <span style="color:#ffffff;">${drawCalls}</span></div>
+        <div>Triangles: <span style="color:#ffffff;">${triangles}</span></div>
+      `
+
+      this.frameCount = 0
+      this.lastPerfUpdateTime = time
     }
   }
 
@@ -611,7 +845,10 @@ export class Galaxy {
       material.dispose()
     }
 
-    for (const { element } of this.labels) {
+    for (const { object, element } of this.labels) {
+      if (object.parent !== null) {
+        this.graphRoot.remove(object)
+      }
       element.remove()
     }
 
@@ -622,12 +859,23 @@ export class Galaxy {
       }
     }
 
+    if (this.lodPointsGeometry) {
+      this.lodPointsGeometry.dispose()
+    }
+    if (this.lodPointsMesh) {
+      this.graphRoot.remove(this.lodPointsMesh)
+      if (this.lodPointsMesh.material instanceof Material) {
+        this.lodPointsMesh.material.dispose()
+      }
+    }
+
     this.graphGeometries.clear()
     this.graphMaterials.clear()
     this.nodeMeshes.length = 0
     this.labels.length = 0
     this.recentLights.length = 0
     this.bugGlowMeshes.length = 0
+    this.nodeMappings.length = 0
   }
 
   private resize(): void {
