@@ -32,11 +32,8 @@ import {
 import { CameraRig } from './CameraRig'
 import { NodeRaycaster } from './Raycaster'
 import { useEtherStore } from '@/store'
-import type {
-  GraphData,
-  GraphNode,
-  NodeType,
-} from '@/types/graph'
+import type { GraphData, GraphNode, NodeType } from '@/types/graph'
+import type { NavCommand } from '@/types/navigator'
 
 const LABEL_DISTANCE = 80
 const NODE_TYPES: NodeType[] = [
@@ -73,6 +70,7 @@ export class Galaxy {
   private readonly recentLights: PointLight[] = []
   private readonly cameraWorldPosition = new Vector3()
   private readonly labelWorldPosition = new Vector3()
+  private readonly storeUnsubscribers: Array<() => void> = []
   private animationFrameId = 0
   private previousFrameTime = 0
   private disposed = false
@@ -122,6 +120,36 @@ export class Galaxy {
     })
     this.resizeObserver.observe(this.resizeTarget)
     this.resize()
+
+    // 1. Subscribe to graph changes in Zustand store
+    let currentGraph = useEtherStore.getState().graph
+    if (currentGraph) {
+      this.loadGraph(currentGraph)
+    }
+
+    const unsubGraph = useEtherStore.subscribe((state) => {
+      if (state.graph !== currentGraph) {
+        currentGraph = state.graph
+        if (currentGraph) {
+          this.loadGraph(currentGraph)
+        } else {
+          this.clearGraph()
+        }
+      }
+    })
+    this.storeUnsubscribers.push(unsubGraph)
+
+    // 2. Subscribe to latest navigator commands
+    let lastCommandTimestamp = 0
+    const unsubCommand = useEtherStore.subscribe((state) => {
+      const latest = state.latestCommand
+      if (latest && latest.timestamp > lastCommandTimestamp) {
+        lastCommandTimestamp = latest.timestamp
+        this.executeCommand(latest.command)
+      }
+    })
+    this.storeUnsubscribers.push(unsubCommand)
+
     this.animationFrameId = requestAnimationFrame(this.animate)
   }
 
@@ -131,7 +159,6 @@ export class Galaxy {
     }
 
     this.clearGraph()
-    useEtherStore.getState().setGraph(data)
 
     const nodesByType = new Map<NodeType, GraphNode[]>(
       NODE_TYPES.map((type) => [type, []]),
@@ -160,9 +187,10 @@ export class Galaxy {
   flyTo(
     position: Vector3,
     duration: number,
+    lookAtTarget?: Vector3,
     onComplete?: () => void,
   ): void {
-    this.cameraRig.flyTo(position, duration, onComplete)
+    this.cameraRig.flyTo(position, duration, lookAtTarget, onComplete)
   }
 
   dispose(): void {
@@ -172,6 +200,13 @@ export class Galaxy {
 
     this.disposed = true
     cancelAnimationFrame(this.animationFrameId)
+
+    // Unsubscribe from Zustand store events
+    for (const unsubscribe of this.storeUnsubscribers) {
+      unsubscribe()
+    }
+    this.storeUnsubscribers.length = 0
+
     this.nodeRaycaster.dispose()
     this.cameraRig.dispose()
     this.resizeObserver.disconnect()
@@ -182,6 +217,43 @@ export class Galaxy {
     this.renderer.renderLists.dispose()
     this.renderer.dispose()
     useEtherStore.getState().setGraph(null)
+  }
+
+  private executeCommand(command: NavCommand): void {
+    if (this.disposed || !command) {
+      return
+    }
+
+    const graph = useEtherStore.getState().graph
+    if (!graph) {
+      return
+    }
+
+    if (command.type === 'fly-to' && command.target) {
+      const node = graph.nodes.find((candidate) => candidate.id === command.target)
+      if (node) {
+        // Highlight/select the target node in HUD
+        useEtherStore.getState().setSelectedNode(node)
+
+        // Compute camera flight destination (slightly offset from node)
+        const targetPos = new Vector3().fromArray(node.position)
+        const offset = new Vector3(0, 20, 60)
+        const cameraTarget = targetPos.clone().add(offset)
+
+        // Initiate flight slerping looking directly at the node
+        this.flyTo(cameraTarget, 1500, targetPos)
+      }
+    } else if (
+      (command.type === 'highlight' ||
+        command.type === 'explain' ||
+        command.type === 'impact') &&
+      command.target
+    ) {
+      const node = graph.nodes.find((candidate) => candidate.id === command.target)
+      if (node) {
+        useEtherStore.getState().setSelectedNode(node)
+      }
+    }
   }
 
   private readonly animate = (time: number): void => {

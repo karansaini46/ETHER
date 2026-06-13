@@ -23,6 +23,8 @@ const MOVEMENT_KEYS = new Set([
 interface Flight {
   startPosition: Vector3
   targetPosition: Vector3
+  startQuaternion: Quaternion
+  targetQuaternion: Quaternion
   duration: number
   elapsed: number
   onComplete?: () => void
@@ -91,11 +93,17 @@ export class CameraRig {
   flyTo(
     position: Vector3,
     duration: number,
+    lookAtTarget?: Vector3 | (() => void),
     onComplete?: () => void,
   ): void {
     if (this.disposed) {
       return
     }
+
+    const actualOnComplete =
+      typeof lookAtTarget === 'function' ? lookAtTarget : onComplete
+    const actualLookAt =
+      lookAtTarget instanceof Vector3 ? lookAtTarget : undefined
 
     const safeDuration = Number.isFinite(duration)
       ? Math.max(0, duration)
@@ -106,17 +114,38 @@ export class CameraRig {
 
     if (safeDuration === 0) {
       this.camera.position.copy(position)
+      if (actualLookAt) {
+        this.camera.lookAt(actualLookAt)
+        const rotation = new Euler().setFromQuaternion(
+          this.camera.quaternion,
+          'YXZ',
+        )
+        this.pitch = rotation.x
+        this.yaw = rotation.y
+      }
       this.releasePointerLock()
-      onComplete?.()
+      actualOnComplete?.()
       return
+    }
+
+    const startQuaternion = this.camera.quaternion.clone()
+    const targetQuaternion = this.camera.quaternion.clone()
+
+    if (actualLookAt) {
+      const tempCamera = this.camera.clone()
+      tempCamera.position.copy(position)
+      tempCamera.lookAt(actualLookAt)
+      targetQuaternion.copy(tempCamera.quaternion)
     }
 
     this.flight = {
       startPosition: this.camera.position.clone(),
       targetPosition: position.clone(),
+      startQuaternion,
+      targetQuaternion,
       duration: safeDuration,
       elapsed: 0,
-      ...(onComplete ? { onComplete } : {}),
+      onComplete: actualOnComplete,
     }
   }
 
@@ -232,6 +261,20 @@ export class CameraRig {
       flight.targetPosition,
       easedProgress,
     )
+
+    this.camera.quaternion.slerpQuaternions(
+      flight.startQuaternion,
+      flight.targetQuaternion,
+      easedProgress,
+    )
+
+    // Keep internal yaw and pitch in sync with the flight's rotation
+    const rotation = new Euler().setFromQuaternion(
+      this.camera.quaternion,
+      'YXZ',
+    )
+    this.pitch = rotation.x
+    this.yaw = rotation.y
 
     if (progress < 1) {
       return

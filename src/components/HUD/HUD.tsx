@@ -2,6 +2,7 @@ import { ChatBar } from './ChatBar'
 import { FilePanel } from './FilePanel'
 import { Legend } from './Legend'
 import { RepoInput } from './RepoInput'
+import { Loading } from '../Loading/Loading'
 import { useEtherStore } from '@/store'
 
 export function HUD() {
@@ -13,6 +14,7 @@ export function HUD() {
       <Legend />
       <FilePanel />
       <ChatBar />
+      <Loading />
     </div>
   )
 }
