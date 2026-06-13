@@ -30,6 +30,8 @@ import {
   updateNodeMaterialPulse,
 } from './NodeMesh'
 import { CameraRig } from './CameraRig'
+import { NodeRaycaster } from './Raycaster'
+import { useEtherStore } from '@/store'
 import type {
   GraphData,
   GraphNode,
@@ -59,12 +61,14 @@ export class Galaxy {
   private readonly labelRenderer: CSS2DRenderer
   private readonly camera: PerspectiveCamera
   private readonly cameraRig: CameraRig
+  private readonly nodeRaycaster: NodeRaycaster
   private readonly scene: Scene
   private readonly graphRoot = new Group()
   private readonly resizeObserver: ResizeObserver
   private readonly resizeTarget: HTMLElement
   private readonly graphGeometries = new Set<BufferGeometry>()
   private readonly graphMaterials = new Set<Material>()
+  private readonly nodeMeshes: InstancedMesh[] = []
   private readonly labels: LabelRecord[] = []
   private readonly recentLights: PointLight[] = []
   private readonly cameraWorldPosition = new Vector3()
@@ -87,6 +91,11 @@ export class Galaxy {
     this.camera.position.set(0, 0, 350)
     this.camera.lookAt(0, 0, 0)
     this.cameraRig = new CameraRig(this.camera, canvas)
+    this.nodeRaycaster = new NodeRaycaster(
+      canvas,
+      this.camera,
+      () => this.nodeMeshes,
+    )
 
     this.scene = new Scene()
     this.scene.background = new Color(0x000000)
@@ -122,6 +131,7 @@ export class Galaxy {
     }
 
     this.clearGraph()
+    useEtherStore.getState().setGraph(data)
 
     const nodesByType = new Map<NodeType, GraphNode[]>(
       NODE_TYPES.map((type) => [type, []]),
@@ -162,6 +172,7 @@ export class Galaxy {
 
     this.disposed = true
     cancelAnimationFrame(this.animationFrameId)
+    this.nodeRaycaster.dispose()
     this.cameraRig.dispose()
     this.resizeObserver.disconnect()
     this.clearGraph()
@@ -170,6 +181,7 @@ export class Galaxy {
     releaseNodeMaterials()
     this.renderer.renderLists.dispose()
     this.renderer.dispose()
+    useEtherStore.getState().setGraph(null)
   }
 
   private readonly animate = (time: number): void => {
@@ -208,6 +220,7 @@ export class Galaxy {
       getNodeMaterial(type),
       nodes.length,
     )
+    mesh.userData.nodeIds = nodes.map((node) => node.id)
     const matrix = new Matrix4()
     const position = new Vector3()
     const scale = new Vector3()
@@ -232,6 +245,7 @@ export class Galaxy {
     recentAttribute.needsUpdate = true
     mesh.computeBoundingSphere()
     this.graphGeometries.add(geometry)
+    this.nodeMeshes.push(mesh)
     this.graphRoot.add(mesh)
   }
 
@@ -340,6 +354,7 @@ export class Galaxy {
 
     this.graphGeometries.clear()
     this.graphMaterials.clear()
+    this.nodeMeshes.length = 0
     this.labels.length = 0
     this.recentLights.length = 0
   }
