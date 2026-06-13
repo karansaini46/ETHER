@@ -3,8 +3,9 @@ import { GoogleGenerativeAI } from '@google/generative-ai'
 import type { GraphData } from '@/types/graph'
 import type { ChatMessage, NavCommand } from '@/types/navigator'
 
+const globalObj = typeof globalThis !== 'undefined' ? (globalThis as typeof globalThis & { process?: { env?: Record<string, string> } }) : null
 const apiKey =
-  (typeof globalThis !== 'undefined' ? (globalThis as any).process?.env?.GEMINI_API_KEY : '') ||
+  globalObj?.process?.env?.GEMINI_API_KEY ||
   import.meta.env?.VITE_GEMINI_API_KEY ||
   ''
 
@@ -25,6 +26,16 @@ function serializeGraph(graph: GraphData): string {
     nodes: nodesSummary,
     edges: edgesSummary,
   })
+}
+
+function debugLog(message: string, error?: unknown): void {
+  if (import.meta.env.DEV) {
+    if (error !== undefined) {
+      console.error(message, error)
+    } else {
+      console.log(message)
+    }
+  }
 }
 
 export async function sendMessage(
@@ -122,7 +133,7 @@ I found the main entry point of the application at src/main.tsx. It sets up the 
           }
         }
       } catch (error) {
-        console.error('Failed to parse NavCommand from assistant response:', error)
+        debugLog('Failed to parse NavCommand from assistant response:', error)
       }
     }
 
@@ -132,11 +143,14 @@ I found the main entry point of the application at src/main.tsx. It sets up the 
       command,
       timestamp: Date.now(),
     }
-  } catch (error: any) {
-    console.error('Gemini API Error:', error)
-    const errorMessage = error?.message || String(error)
+  } catch (error: unknown) {
+    debugLog('Gemini API Error:', error)
+    const errorMessage = error instanceof Error ? error.message : String(error)
     const isRateLimit =
-      error?.status === 429 ||
+      (typeof error === 'object' &&
+        error !== null &&
+        'status' in error &&
+        (error as { status: unknown }).status === 429) ||
       errorMessage.includes('429') ||
       errorMessage.toLowerCase().includes('rate limit')
 

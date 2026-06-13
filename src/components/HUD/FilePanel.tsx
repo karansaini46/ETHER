@@ -185,5 +185,3 @@ function formatFileSize(size: number): string {
 
   return `${(size / 1_048_576).toFixed(1)} MB`
 }
-
-export default FilePanel

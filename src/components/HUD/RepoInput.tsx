@@ -65,4 +65,3 @@ export function RepoInput() {
     </div>
   )
 }
-export default RepoInput

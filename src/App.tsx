@@ -71,7 +71,9 @@ function App() {
                 )
                 contents.set(file.path, content)
               } catch (error) {
-                console.warn(`Skipped loading content for ${file.path}:`, error)
+                if (import.meta.env.DEV) {
+                  console.warn(`Skipped loading content for ${file.path}:`, error)
+                }
               }
             }),
           )
@@ -97,14 +99,17 @@ function App() {
         actions.setGraph(graphData)
         // Phase 4: ready
         actions.setStatus('ready')
-      } catch (error: any) {
+      } catch (error: unknown) {
         if (controller.signal.aborted) {
           return
         }
-        console.error('Failed to build graph:', error)
-        actions.setError(error?.message || String(error))
+        if (import.meta.env.DEV) {
+          console.error('Failed to build graph:', error)
+        }
+        const message = error instanceof Error ? error.message : String(error)
+        actions.setError(message)
         actions.setStatus('error')
-        alert(`Failed to build repository universe: ${error?.message || error}`)
+        alert(`Failed to build repository universe: ${message}`)
         actions.setRepo(null)
       }
     }

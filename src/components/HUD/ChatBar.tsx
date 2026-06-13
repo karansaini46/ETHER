@@ -193,4 +193,3 @@ export function ChatBar() {
     </div>
   )
 }
-export default ChatBar
