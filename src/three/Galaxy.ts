@@ -29,6 +29,7 @@ import {
   retainNodeMaterials,
   updateNodeMaterialPulse,
 } from './NodeMesh'
+import { CameraRig } from './CameraRig'
 import type {
   GraphData,
   GraphNode,
@@ -57,6 +58,7 @@ export class Galaxy {
   private readonly renderer: WebGLRenderer
   private readonly labelRenderer: CSS2DRenderer
   private readonly camera: PerspectiveCamera
+  private readonly cameraRig: CameraRig
   private readonly scene: Scene
   private readonly graphRoot = new Group()
   private readonly resizeObserver: ResizeObserver
@@ -68,6 +70,7 @@ export class Galaxy {
   private readonly cameraWorldPosition = new Vector3()
   private readonly labelWorldPosition = new Vector3()
   private animationFrameId = 0
+  private previousFrameTime = 0
   private disposed = false
 
   constructor(canvas: HTMLCanvasElement) {
@@ -83,6 +86,7 @@ export class Galaxy {
     this.camera = new PerspectiveCamera(60, 1, 0.1, 2_000)
     this.camera.position.set(0, 0, 350)
     this.camera.lookAt(0, 0, 0)
+    this.cameraRig = new CameraRig(this.camera, canvas)
 
     this.scene = new Scene()
     this.scene.background = new Color(0x000000)
@@ -143,6 +147,14 @@ export class Galaxy {
     this.createEdges(data)
   }
 
+  flyTo(
+    position: Vector3,
+    duration: number,
+    onComplete?: () => void,
+  ): void {
+    this.cameraRig.flyTo(position, duration, onComplete)
+  }
+
   dispose(): void {
     if (this.disposed) {
       return
@@ -150,6 +162,7 @@ export class Galaxy {
 
     this.disposed = true
     cancelAnimationFrame(this.animationFrameId)
+    this.cameraRig.dispose()
     this.resizeObserver.disconnect()
     this.clearGraph()
     this.scene.clear()
@@ -163,6 +176,11 @@ export class Galaxy {
     if (this.disposed) {
       return
     }
+
+    const delta =
+      this.previousFrameTime === 0 ? 0 : (time - this.previousFrameTime) / 1_000
+    this.previousFrameTime = time
+    this.cameraRig.update(delta)
 
     const pulse = 0.12 + (Math.sin(time * 0.004) + 1) * 0.08
     updateNodeMaterialPulse(pulse)
