@@ -125,3 +125,30 @@ body {
     scroll-behavior: auto !important;
   }
 }
+
+/* Documented Z-Index Stacking System */
+.z-canvas { z-index: 0; }
+.z-labels { z-index: 10; }
+.z-hud-rails { z-index: 20; }
+.z-panels { z-index: 30; }
+.z-search-overlay { z-index: 40; }
+.z-bottom-sheets { z-index: 50; }
+.z-dialogs { z-index: 60; }
+.z-toasts { z-index: 70; }
+
+/* Custom layout scroll utilities */
+.hud-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-hairline) var(--color-void);
+}
+.hud-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+.hud-scrollbar::-webkit-scrollbar-track {
+  background: var(--color-void);
+}
+.hud-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--color-border-hairline);
+  border-radius: 2px;
+}
+

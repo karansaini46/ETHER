@@ -28,28 +28,59 @@ describe('explorer Zustand store', () => {
     useExplorerStore.setState({
       graph: null,
       selectedNode: null,
+      selectedNodeId: null,
       highlightedNodes: new Set(),
       highlightedEdges: new Set(),
       isolatedCluster: null,
       searchOpen: false,
       isDemo: false,
+      inspectorOpen: false,
+      renderingOpen: false,
+      clustersOpen: true,
+      nodeMap: new Map(),
+      nodeIdByPath: new Map(),
+      clusterNodeIdsByPath: new Map(),
     });
   });
 
   it('should initialize with default empty parameters', () => {
     const state = useExplorerStore.getState();
     expect(state.selectedNode).toBeNull();
+    expect(state.selectedNodeId).toBeNull();
     expect(state.isolatedCluster).toBeNull();
     expect(state.searchOpen).toBe(false);
   });
 
   it('should update selectedNode and clear highlighted structures', () => {
+    // Mock the graph map setup
+    useExplorerStore.getState().setGraph({
+      nodes: [mockNode],
+      edges: [],
+    });
+
     useExplorerStore.getState().selectNode(mockNode);
     expect(useExplorerStore.getState().selectedNode).toEqual(mockNode);
+    expect(useExplorerStore.getState().selectedNodeId).toBe(mockNode.id);
+    expect(useExplorerStore.getState().inspectorOpen).toBe(true);
 
     // Deselect
     useExplorerStore.getState().selectNode(null);
     expect(useExplorerStore.getState().selectedNode).toBeNull();
+    expect(useExplorerStore.getState().selectedNodeId).toBeNull();
+  });
+
+  it('should resolve node by path with normalization', () => {
+    const graphData = {
+      nodes: [
+        { ...mockNode, id: 'src/components/Button.tsx', label: 'Button' }
+      ],
+      edges: []
+    };
+    useExplorerStore.getState().setGraph(graphData);
+
+    // Select using path with backslashes
+    useExplorerStore.getState().selectNode('src\\components\\Button.tsx');
+    expect(useExplorerStore.getState().selectedNodeId).toBe('src/components/Button.tsx');
   });
 
   it('should set searchOpen state toggle', () => {

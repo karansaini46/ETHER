@@ -16,6 +16,8 @@ export function CameraController() {
   const previousCameraState = useExplorerStore((s) => s.previousCameraState);
   const setPreviousCameraState = useExplorerStore((s) => s.setPreviousCameraState);
   const setSearchOpen = useExplorerStore((s) => s.setSearchOpen);
+  const isolatedCluster = useExplorerStore((s) => s.isolatedCluster);
+  const graph = useExplorerStore((s) => s.graph);
 
   const controlsRef = useRef<any>(null);
   const isDragging = useRef(false);
@@ -47,7 +49,7 @@ export function CameraController() {
       targetPos.current = new Vector3(x, y + focusDist * 0.3, z + focusDist);
       targetLookAt.current = new Vector3(x, y, z);
       isTransitioning.current = true;
-    } else {
+    } else if (!isolatedCluster) {
       // If focusedNode is cleared, smoothly return back to previous state if it exists
       if (previousCameraState) {
         const [px, py, pz] = previousCameraState.position;
@@ -58,6 +60,64 @@ export function CameraController() {
       }
     }
   }, [focusedNode]);
+
+  // Handle isolatedCluster changes to zoom/pan to fit the constellation system
+  useEffect(() => {
+    if (isolatedCluster && graph) {
+      const clusterNodes = graph.nodes.filter((n) => n.folder === isolatedCluster);
+      if (clusterNodes.length > 0) {
+        // Save current state before transitioning
+        if (controlsRef.current && !previousCameraState) {
+          const currentPos: [number, number, number] = [camera.position.x, camera.position.y, camera.position.z];
+          const currentTgt: [number, number, number] = [
+            controlsRef.current.target.x,
+            controlsRef.current.target.y,
+            controlsRef.current.target.z,
+          ];
+          setPreviousCameraState({ position: currentPos, target: currentTgt });
+        }
+
+        let minX = Infinity, maxX = -Infinity;
+        let minY = Infinity, maxY = -Infinity;
+        let minZ = Infinity, maxZ = -Infinity;
+
+        for (const node of clusterNodes) {
+          const [nx, ny, nz] = node.position;
+          if (nx < minX) minX = nx;
+          if (nx > maxX) maxX = nx;
+          if (ny < minY) minY = ny;
+          if (ny > maxY) maxY = ny;
+          if (nz < minZ) minZ = nz;
+          if (nz > maxZ) maxZ = nz;
+        }
+
+        const cx = (minX + maxX) / 2;
+        const cy = (minY + maxY) / 2;
+        const cz = (minZ + maxZ) / 2;
+
+        const dx = maxX - minX;
+        const dy = maxY - minY;
+        const dz = maxZ - minZ;
+        const maxSpan = Math.max(dx, dy, dz, 15);
+
+        // Frame all nodes nicely based on size of cluster
+        const fitDist = maxSpan * 1.35 + 16;
+
+        targetPos.current = new Vector3(cx, cy + fitDist * 0.35, cz + fitDist);
+        targetLookAt.current = new Vector3(cx, cy, cz);
+        isTransitioning.current = true;
+      }
+    } else if (!isolatedCluster && !focusedNode) {
+      // Return to home state when isolatedCluster is cleared
+      if (previousCameraState) {
+        const [px, py, pz] = previousCameraState.position;
+        const [tx, ty, tz] = previousCameraState.target;
+        targetPos.current = new Vector3(px, py, pz);
+        targetLookAt.current = new Vector3(tx, ty, tz);
+        isTransitioning.current = true;
+      }
+    }
+  }, [isolatedCluster, graph]);
 
   // Keyboard shortcuts
   useKeyboardShortcuts([
@@ -123,7 +183,7 @@ export function CameraController() {
 
         if (posReached && tgtReached) {
           isTransitioning.current = false;
-          if (!focusedNode) {
+          if (!focusedNode && !isolatedCluster) {
             setPreviousCameraState(null);
           }
         }
