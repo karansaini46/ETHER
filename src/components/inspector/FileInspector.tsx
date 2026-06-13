@@ -3,7 +3,6 @@ import { useExplorerStore } from '@/stores/explorer';
 import { useNavigatorStore } from '@/stores/navigator';
 import { 
   X, 
-  Network, 
   FileCode, 
   MessageSquare, 
   Compass, 
@@ -154,6 +153,10 @@ export function FileInspector() {
               <div className={`font-bold uppercase mt-0.5 ${selectedNode.riskLevel === 'high' ? 'text-danger' : selectedNode.riskLevel === 'medium' ? 'text-accent-primary' : 'text-accent-secondary'}`}>
                 {selectedNode.riskLevel}
               </div>
+            </div>
+            <div className="col-span-2 border-t border-primary/5 pt-2 mt-1">
+              <div className="text-[8px] text-secondary/40 tracking-wider">DEPENDENCY COUNT</div>
+              <div className="text-primary font-bold mt-0.5">{totalDependencyCount} relations (in/out)</div>
             </div>
           </div>
 
