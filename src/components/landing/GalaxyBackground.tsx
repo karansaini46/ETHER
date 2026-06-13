@@ -90,6 +90,14 @@ export function GalaxyBackground() {
     let angleY = 0.001; // Continuous slow orbital drift
     let angleX = 0.0005;
 
+    let projected: Array<{
+      node: StarNode;
+      x: number;
+      y: number;
+      z: number;
+      factor: number;
+    }> = [];
+
     const render = () => {
       ctx.fillStyle = '#090909';
       ctx.fillRect(0, 0, width, height);
@@ -124,7 +132,7 @@ export function GalaxyBackground() {
       const sinX = Math.sin(angleX);
 
       // Project nodes to 2D
-      const projected = nodesRef.current.map((node) => {
+      projected = nodesRef.current.map((node) => {
         // Rotate around Y axis
         let x1 = node.x * cosY - node.z * sinY;
         let z1 = node.x * sinY + node.z * cosY;
