@@ -1,6 +1,8 @@
-import { type FormEvent, useEffect, useRef } from 'react'
+import { type FormEvent, useEffect, useRef, useState } from 'react'
 
-import { useEtherStore } from '@/store'
+import { sendMessage } from '@/lib/navigator'
+import { useChatHistory, useGraph, useStore } from '@/store'
+import type { ChatMessage } from '@/types/navigator'
 
 function isEditableElement(element: Element | null): boolean {
   if (!(element instanceof HTMLElement)) {
@@ -17,25 +19,15 @@ function isEditableElement(element: Element | null): boolean {
 
 export function ChatBar() {
   const inputRef = useRef<HTMLInputElement>(null)
-  const graph = useEtherStore((state) => state.graph)
-  const chatDraft = useEtherStore((state) => state.chatDraft)
-  const chatFocusVersion = useEtherStore((state) => state.chatFocusVersion)
-  const chatHistory = useEtherStore((state) => state.chatHistory)
-  const isLoadingChat = useEtherStore((state) => state.isLoadingChat)
-  const setChatDraft = useEtherStore((state) => state.setChatDraft)
-  const submitNavigatorMessage = useEtherStore(
-    (state) => state.submitNavigatorMessage,
-  )
+  const graph = useGraph()
+  const chatHistory = useChatHistory()
+  const chatOpen = useStore((state) => state.chatOpen)
+  const actions = useStore((state) => state.actions)
 
-  useEffect(() => {
-    if (chatFocusVersion === 0) {
-      return
-    }
+  const [chatDraft, setChatDraft] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
 
-    inputRef.current?.focus()
-    inputRef.current?.select()
-  }, [chatFocusVersion])
-
+  // Listen to global 'T' key to open chat
   useEffect(() => {
     const handleGlobalKeyDown = (event: KeyboardEvent) => {
       if (
@@ -43,8 +35,7 @@ export function ChatBar() {
         !isEditableElement(document.activeElement)
       ) {
         event.preventDefault()
-        inputRef.current?.focus()
-        inputRef.current?.select()
+        actions.openChat()
       }
     }
 
@@ -52,20 +43,72 @@ export function ChatBar() {
     return () => {
       window.removeEventListener('keydown', handleGlobalKeyDown)
     }
-  }, [])
+  }, [actions])
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  // Listen to custom 'Explain this file' event from FilePanel
+  useEffect(() => {
+    const handleExplainEvent = (event: Event) => {
+      const fileId = (event as CustomEvent).detail
+      setChatDraft(`Explain this file: ${fileId}`)
+      actions.openChat()
+    }
+
+    window.addEventListener('ether-chat-explain', handleExplainEvent)
+    return () => {
+      window.removeEventListener('ether-chat-explain', handleExplainEvent)
+    }
+  }, [actions])
+
+  // Focus input when chat opens
+  useEffect(() => {
+    if (chatOpen) {
+      const timer = setTimeout(() => {
+        inputRef.current?.focus()
+        inputRef.current?.select()
+      }, 50)
+      return () => clearTimeout(timer)
+    }
+  }, [chatOpen])
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    submitNavigatorMessage(chatDraft)
+    const trimmed = chatDraft.trim()
+    if (!trimmed || isLoading || !graph) {
+      return
+    }
+
+    setChatDraft('')
+    setIsLoading(true)
+
+    const userMessage: ChatMessage = {
+      role: 'user',
+      content: trimmed,
+      timestamp: Date.now(),
+    }
+    actions.addMessage(userMessage)
+
+    try {
+      const assistantMessage = await sendMessage(
+        trimmed,
+        graph,
+        [...chatHistory, userMessage],
+      )
+      actions.addMessage(assistantMessage)
+    } catch (error) {
+      console.error('Failed to get navigator message:', error)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Escape') {
       inputRef.current?.blur()
+      actions.closeChat()
     }
   }
 
-  if (!graph) {
+  if (!graph || !chatOpen) {
     return null
   }
 
@@ -126,11 +169,11 @@ export function ChatBar() {
           onKeyDown={handleKeyDown}
           placeholder="Ask about this repository..."
           autoComplete="off"
-          disabled={isLoadingChat}
+          disabled={isLoading}
         />
 
         {/* Pulsing dot indicator during API call */}
-        {isLoadingChat && (
+        {isLoading && (
           <div className="flex items-center justify-center px-2">
             <span className="relative flex h-2.5 w-2.5">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-cyan opacity-75"></span>
@@ -142,7 +185,7 @@ export function ChatBar() {
         <button
           type="submit"
           className="font-label rounded-xl border border-cyan/40 bg-cyan/10 px-4 py-2 text-sm font-semibold text-cyan transition-colors hover:bg-cyan/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan"
-          disabled={isLoadingChat}
+          disabled={isLoading}
         >
           Send
         </button>
@@ -150,3 +193,4 @@ export function ChatBar() {
     </div>
   )
 }
+export default ChatBar

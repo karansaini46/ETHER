@@ -73,19 +73,23 @@ function createNodeMaterial(type: NodeType): MeshStandardMaterial {
 
     shader.vertexShader = `
       attribute float instanceRecent;
+      attribute float instanceHighlighted;
       varying float vInstanceRecent;
+      varying float vInstanceHighlighted;
       ${shader.vertexShader}
     `.replace(
       '#include <begin_vertex>',
       `
         #include <begin_vertex>
         vInstanceRecent = instanceRecent;
+        vInstanceHighlighted = instanceHighlighted;
       `,
     )
 
     shader.fragmentShader = `
       uniform float recentPulse;
       varying float vInstanceRecent;
+      varying float vInstanceHighlighted;
       ${shader.fragmentShader}
     `
       .replace(
@@ -102,6 +106,7 @@ function createNodeMaterial(type: NodeType): MeshStandardMaterial {
         `
           #include <emissivemap_fragment>
           totalEmissiveRadiance += diffuseColor.rgb * vInstanceRecent * recentPulse;
+          totalEmissiveRadiance += diffuseColor.rgb * vInstanceHighlighted * 0.8;
         `,
       )
   }

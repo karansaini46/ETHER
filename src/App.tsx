@@ -4,14 +4,13 @@ import { HUD } from '@/components/HUD/HUD'
 import { fetchCommits, fetchFileContent, fetchIssues, fetchRepoTree } from '@/lib/github'
 import { buildGraph } from '@/lib/graph'
 import { buildGraphInWorker } from '@/lib/workers/graph'
-import { useEtherStore } from '@/store'
+import { useStore } from '@/store'
 import { Galaxy } from '@/three/Galaxy'
 
 function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const repositoryUrl = useEtherStore((state) => state.repositoryUrl)
-  const setGraph = useEtherStore((state) => state.setGraph)
-  const setGraphLoading = useEtherStore((state) => state.setGraphLoading)
+  const repo = useStore((state) => state.repo)
+  const actions = useStore((state) => state.actions)
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -28,27 +27,20 @@ function App() {
   }, [])
 
   useEffect(() => {
-    if (!repositoryUrl) {
+    if (!repo) {
       return
     }
 
-    const match = /github\.com\/([^/]+)\/([^/]+)/.exec(repositoryUrl)
-    if (!match) {
-      alert(
-        'Invalid GitHub repository URL. Format must match: https://github.com/owner/repository',
-      )
-      useEtherStore.getState().setRepositoryUrl('')
-      return
-    }
-
-    const [, owner, repo] = match
+    const { owner, name } = repo
     const controller = new AbortController()
 
     async function loadRepository() {
-      setGraphLoading(true, 'Connecting to repository...')
       try {
-        setGraphLoading(true, 'Fetching file structure...')
-        const files = await fetchRepoTree(owner, repo, controller.signal)
+        actions.setError(null)
+
+        // Phase 1: loading-tree
+        actions.setStatus('loading-tree')
+        const files = await fetchRepoTree(owner, name, controller.signal)
 
         if (files.length === 0) {
           throw new Error('No files found or repository is empty.')
@@ -58,10 +50,8 @@ function App() {
           /\.(tsx?|jsx?|json|css|scss|html)$/i.test(file.path),
         )
 
-        setGraphLoading(
-          true,
-          `Loading file contents (0/${codeFiles.length})...`,
-        )
+        // Phase 2: loading-contents
+        actions.setStatus('loading-contents')
         const contents = new Map<string, string>()
 
         const chunkSize = 15
@@ -71,17 +61,12 @@ function App() {
           }
 
           const chunk = codeFiles.slice(index, index + chunkSize)
-          setGraphLoading(
-            true,
-            `Downloading file contents (${index}/${codeFiles.length})...`,
-          )
-
           await Promise.all(
             chunk.map(async (file) => {
               try {
                 const content = await fetchFileContent(
                   owner,
-                  repo,
+                  name,
                   file.path,
                   controller.signal,
                 )
@@ -93,13 +78,14 @@ function App() {
           )
         }
 
-        setGraphLoading(true, 'Loading commit history and issue tracker...')
+        // Fetch commits and issues before starting graph construction
         const [commits, issues] = await Promise.all([
-          fetchCommits(owner, repo, controller.signal).catch(() => []),
-          fetchIssues(owner, repo, controller.signal).catch(() => []),
+          fetchCommits(owner, name, controller.signal).catch(() => []),
+          fetchIssues(owner, name, controller.signal).catch(() => []),
         ])
 
-        setGraphLoading(true, 'Mapping 3D galactic codebase structure...')
+        // Phase 3: computing-graph
+        actions.setStatus('computing-graph')
         let graphData
 
         if (files.length > 200) {
@@ -113,18 +99,18 @@ function App() {
           graphData = buildGraph(files, contents, commits, issues)
         }
 
-        setGraph(graphData)
+        actions.setGraph(graphData)
+        // Phase 4: ready
+        actions.setStatus('ready')
       } catch (error: any) {
         if (controller.signal.aborted) {
           return
         }
         console.error('Failed to build graph:', error)
+        actions.setError(error?.message || String(error))
+        actions.setStatus('error')
         alert(`Failed to build repository universe: ${error?.message || error}`)
-        useEtherStore.getState().setRepositoryUrl('')
-      } finally {
-        if (!controller.signal.aborted) {
-          setGraphLoading(false)
-        }
+        actions.setRepo(null)
       }
     }
 
@@ -133,7 +119,7 @@ function App() {
     return () => {
       controller.abort()
     }
-  }, [repositoryUrl, setGraph, setGraphLoading])
+  }, [repo, actions])
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-void text-cyan">

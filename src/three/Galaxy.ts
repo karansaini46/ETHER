@@ -31,7 +31,7 @@ import {
 } from './NodeMesh'
 import { CameraRig } from './CameraRig'
 import { NodeRaycaster } from './Raycaster'
-import { useEtherStore } from '@/store'
+import { useStore } from '@/store'
 import type { GraphData, GraphNode, NodeType } from '@/types/graph'
 import type { NavCommand } from '@/types/navigator'
 
@@ -122,12 +122,12 @@ export class Galaxy {
     this.resize()
 
     // 1. Subscribe to graph changes in Zustand store
-    let currentGraph = useEtherStore.getState().graph
+    let currentGraph = useStore.getState().graph
     if (currentGraph) {
       this.loadGraph(currentGraph)
     }
 
-    const unsubGraph = useEtherStore.subscribe((state) => {
+    const unsubGraph = useStore.subscribe((state) => {
       if (state.graph !== currentGraph) {
         currentGraph = state.graph
         if (currentGraph) {
@@ -139,16 +139,19 @@ export class Galaxy {
     })
     this.storeUnsubscribers.push(unsubGraph)
 
-    // 2. Subscribe to latest navigator commands
-    let lastCommandTimestamp = 0
-    const unsubCommand = useEtherStore.subscribe((state) => {
-      const latest = state.latestCommand
-      if (latest && latest.timestamp > lastCommandTimestamp) {
-        lastCommandTimestamp = latest.timestamp
-        this.executeCommand(latest.command)
+    // 2. Subscribe to latest chat history messages to see if there is a command to run
+    let lastHandledMessageTimestamp = 0
+    const unsubChatHistory = useStore.subscribe((state) => {
+      const messages = state.chatHistory
+      if (messages.length > 0) {
+        const latestMsg = messages[messages.length - 1]
+        if (latestMsg.role === 'assistant' && latestMsg.command && latestMsg.timestamp > lastHandledMessageTimestamp) {
+          lastHandledMessageTimestamp = latestMsg.timestamp
+          this.executeCommand(latestMsg.command)
+        }
       }
     })
-    this.storeUnsubscribers.push(unsubCommand)
+    this.storeUnsubscribers.push(unsubChatHistory)
 
     this.animationFrameId = requestAnimationFrame(this.animate)
   }
@@ -216,7 +219,6 @@ export class Galaxy {
     releaseNodeMaterials()
     this.renderer.renderLists.dispose()
     this.renderer.dispose()
-    useEtherStore.getState().setGraph(null)
   }
 
   private executeCommand(command: NavCommand): void {
@@ -224,7 +226,7 @@ export class Galaxy {
       return
     }
 
-    const graph = useEtherStore.getState().graph
+    const { graph, actions } = useStore.getState()
     if (!graph) {
       return
     }
@@ -233,7 +235,7 @@ export class Galaxy {
       const node = graph.nodes.find((candidate) => candidate.id === command.target)
       if (node) {
         // Highlight/select the target node in HUD
-        useEtherStore.getState().setSelectedNode(node)
+        actions.selectNode(node)
 
         // Compute camera flight destination (slightly offset from node)
         const targetPos = new Vector3().fromArray(node.position)
@@ -244,14 +246,22 @@ export class Galaxy {
         this.flyTo(cameraTarget, 1500, targetPos)
       }
     } else if (
-      (command.type === 'highlight' ||
-        command.type === 'explain' ||
+      command.type === 'highlight' &&
+      command.target
+    ) {
+      const node = graph.nodes.find((candidate) => candidate.id === command.target)
+      if (node) {
+        actions.highlightNodes(new Set([node.id]))
+        actions.selectNode(node)
+      }
+    } else if (
+      (command.type === 'explain' ||
         command.type === 'impact') &&
       command.target
     ) {
       const node = graph.nodes.find((candidate) => candidate.id === command.target)
       if (node) {
-        useEtherStore.getState().setSelectedNode(node)
+        actions.selectNode(node)
       }
     }
   }
@@ -273,18 +283,54 @@ export class Galaxy {
       light.intensity = 0.35 + (Math.sin(time * 0.004) + 1) * 0.12
     }
 
+    // Update highlights in the loop without triggering React renders
+    this.updateHighlightedStars()
+
     this.updateLabelVisibility()
     this.renderer.render(this.scene, this.camera)
     this.labelRenderer.render(this.scene, this.camera)
     this.animationFrameId = requestAnimationFrame(this.animate)
   }
 
+  private updateHighlightedStars(): void {
+    const { highlightedNodes } = useStore.getState()
+
+    for (const mesh of this.nodeMeshes) {
+      const nodeIds = mesh.userData.nodeIds as string[]
+      if (!nodeIds) continue
+
+      const attribute = mesh.geometry.getAttribute('instanceHighlighted') as InstancedBufferAttribute
+      if (!attribute) continue
+
+      let needsUpdate = false
+      for (let i = 0; i < nodeIds.length; i++) {
+        const nodeId = nodeIds[i]
+        const isHighlighted = highlightedNodes.has(nodeId) ? 1.0 : 0.0
+
+        if (attribute.getX(i) !== isHighlighted) {
+          attribute.setX(i, isHighlighted)
+          needsUpdate = true
+        }
+      }
+
+      if (needsUpdate) {
+        attribute.needsUpdate = true
+      }
+    }
+  }
+
   private createNodeInstances(type: NodeType, nodes: GraphNode[]): void {
     const geometry = new IcosahedronGeometry(1, 2)
     const recentFlags = new Float32Array(nodes.length)
+    const highlightedFlags = new Float32Array(nodes.length)
+
     geometry.setAttribute(
       'instanceRecent',
       new InstancedBufferAttribute(recentFlags, 1),
+    )
+    geometry.setAttribute(
+      'instanceHighlighted',
+      new InstancedBufferAttribute(highlightedFlags, 1),
     )
 
     const mesh = new InstancedMesh(
@@ -305,6 +351,7 @@ export class Galaxy {
       mesh.setMatrixAt(index, matrix)
       mesh.setColorAt(index, getNodeColor(type, node.hasIssue))
       recentFlags[index] = node.isRecent ? 1 : 0
+      highlightedFlags[index] = 0
     })
 
     mesh.instanceMatrix.needsUpdate = true
@@ -315,6 +362,9 @@ export class Galaxy {
 
     const recentAttribute = geometry.getAttribute('instanceRecent')
     recentAttribute.needsUpdate = true
+    const highlightedAttribute = geometry.getAttribute('instanceHighlighted')
+    highlightedAttribute.needsUpdate = true
+
     mesh.computeBoundingSphere()
     this.graphGeometries.add(geometry)
     this.nodeMeshes.push(mesh)

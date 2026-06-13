@@ -4,7 +4,7 @@ import type { GraphData } from '@/types/graph'
 import type { ChatMessage, NavCommand } from '@/types/navigator'
 
 const apiKey =
-  (typeof process !== 'undefined' ? process.env?.GEMINI_API_KEY : '') ||
+  (typeof globalThis !== 'undefined' ? (globalThis as any).process?.env?.GEMINI_API_KEY : '') ||
   import.meta.env?.VITE_GEMINI_API_KEY ||
   ''
 

@@ -1,14 +1,11 @@
 import { useMemo } from 'react'
 
-import { useEtherStore } from '@/store'
+import { useGraph, useSelectedNode, useStore } from '@/store'
 
 export function FilePanel() {
-  const graph = useEtherStore((state) => state.graph)
-  const selectedNode = useEtherStore((state) => state.selectedNode)
-  const setSelectedNode = useEtherStore((state) => state.setSelectedNode)
-  const prepareNavigatorMessage = useEtherStore(
-    (state) => state.prepareNavigatorMessage,
-  )
+  const graph = useGraph()
+  const selectedNode = useSelectedNode()
+  const actions = useStore((state) => state.actions)
   const isOpen = selectedNode !== null
 
   const dependencies = useMemo(() => {
@@ -40,7 +37,9 @@ export function FilePanel() {
       return
     }
 
-    prepareNavigatorMessage(`Explain this file: ${selectedNode.id}`)
+    window.dispatchEvent(
+      new CustomEvent('ether-chat-explain', { detail: selectedNode.id }),
+    )
   }
 
   return (
@@ -67,7 +66,7 @@ export function FilePanel() {
               type="button"
               className="font-data rounded-lg border border-slate-600/70 px-3 py-2 text-sm text-slate-300 transition-colors hover:border-red/70 hover:text-red focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan"
               onClick={() => {
-                setSelectedNode(null)
+                actions.selectNode(null)
               }}
               aria-label="Close file panel"
             >
@@ -186,3 +185,5 @@ function formatFileSize(size: number): string {
 
   return `${(size / 1_048_576).toFixed(1)} MB`
 }
+
+export default FilePanel

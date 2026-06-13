@@ -1,15 +1,30 @@
 import { type FormEvent, useState } from 'react'
 
-import { useEtherStore } from '@/store'
+import { useStore } from '@/store'
 
 export function RepoInput() {
-  const repositoryUrl = useEtherStore((state) => state.repositoryUrl)
-  const setRepositoryUrl = useEtherStore((state) => state.setRepositoryUrl)
-  const [inputValue, setInputValue] = useState(repositoryUrl)
+  const repo = useStore((state) => state.repo)
+  const actions = useStore((state) => state.actions)
+  const [inputValue, setInputValue] = useState(repo?.url || '')
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    setRepositoryUrl(inputValue.trim())
+    const trimmedUrl = inputValue.trim()
+
+    const match = /github\.com\/([^/]+)\/([^/]+)/.exec(trimmedUrl)
+    if (!match) {
+      alert(
+        'Invalid GitHub repository URL. Format must match: https://github.com/owner/repository',
+      )
+      return
+    }
+
+    const [, owner, name] = match
+    actions.setRepo({
+      owner,
+      name,
+      url: trimmedUrl,
+    })
   }
 
   return (
@@ -50,3 +65,4 @@ export function RepoInput() {
     </div>
   )
 }
+export default RepoInput

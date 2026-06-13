@@ -51,7 +51,7 @@ export class NodeRaycaster {
     const bounds = this.canvas.getBoundingClientRect()
 
     if (bounds.width <= 0 || bounds.height <= 0) {
-      useEtherStore.getState().setSelectedNode(null)
+      useEtherStore.getState().actions.selectNode(null)
       return
     }
 
@@ -82,10 +82,10 @@ export class NodeRaycaster {
 
       event.preventDefault()
       event.stopImmediatePropagation()
-      useEtherStore.getState().setSelectedNode(node)
+      useEtherStore.getState().actions.selectNode(node)
       return
     }
 
-    useEtherStore.getState().setSelectedNode(null)
+    useEtherStore.getState().actions.selectNode(null)
   }
 }

@@ -1,11 +1,23 @@
-import { useEtherStore } from '@/store'
+import { useStatus } from '@/store'
 
 export function Loading() {
-  const isGraphLoading = useEtherStore((state) => state.isGraphLoading)
-  const graphLoadingStatus = useEtherStore((state) => state.graphLoadingStatus)
+  const status = useStatus()
 
-  if (!isGraphLoading) {
+  if (status === 'idle' || status === 'ready' || status === 'error') {
     return null
+  }
+
+  const getStatusText = () => {
+    switch (status) {
+      case 'loading-tree':
+        return 'Downloading repository file structure...'
+      case 'loading-contents':
+        return 'Downloading source code contents...'
+      case 'computing-graph':
+        return 'Mapping 3D galactic codebase structure...'
+      default:
+        return 'Connecting to repository...'
+    }
   }
 
   return (
@@ -21,7 +33,7 @@ export function Loading() {
           Mapping Repository Universe
         </h2>
         <p className="font-data mt-4 text-xs text-cyan animate-pulse text-center">
-          {graphLoadingStatus || 'Reading stars...'}
+          {getStatusText()}
         </p>
       </div>
     </div>
