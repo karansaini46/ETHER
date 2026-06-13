@@ -4,17 +4,18 @@ import { useExplorerStore } from '@/stores/explorer';
 import type { NodeType } from '@/types/graph';
 
 const NODE_COLORS: Record<NodeType, string> = {
-  component: '#00d4ff',
-  util: '#7c3aed',
-  store: '#ff6b35',
-  style: '#ec4899',
-  config: '#94a3b8',
-  test: '#22c55e',
-  entry: '#ffffff',
-  unknown: '#64748b',
+  entry: '#ECE9E1',      // Warm off-white
+  component: '#A8AF86',  // Muted sage/green
+  util: '#ECE9E1',       // Off-white
+  store: '#E3C78A',      // Muted amber
+  style: '#97958E',      // Dusty gray
+  config: '#6E6B64',     // Darker gray
+  test: '#A8AF86',       // Muted sage
+  unknown: '#6E6B64',    // Darker gray
 };
 
-const ISSUE_COLOR = '#ff2d55';
+const ISSUE_COLOR = '#C6504B'; // Deep red for risk/issues
+
 
 export function StarField() {
   const meshRef = useRef<InstancedMesh>(null);

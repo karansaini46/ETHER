@@ -20,8 +20,8 @@ export function DemoPage() {
 
   if (!graph) {
     return (
-      <div className="flex h-screen w-screen items-center justify-center font-mono text-cyber-blue">
-        INITIALIZING SYNTHETIC MATRIX SYSTEMS...
+      <div className="flex h-screen w-screen items-center justify-center font-mono text-xs text-accent-secondary bg-void">
+        Loading demo visualization...
       </div>
     );
   }

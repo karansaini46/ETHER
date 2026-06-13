@@ -3,26 +3,26 @@ import { Logo } from '@/components/brand/Logo';
 
 export function PrivacyPage() {
   return (
-    <div className="min-h-screen bg-void px-6 py-12 flex flex-col items-center overflow-y-auto">
+    <div className="min-h-screen bg-void px-6 py-12 flex flex-col items-center overflow-y-auto font-mono text-xs">
       <header className="w-full max-w-4xl flex items-center justify-between mb-12">
         <Link to="/">
           <Logo size="sm" />
         </Link>
-        <Link to="/" className="text-xs font-mono text-cyber-blue hover:underline">
-          &lt; BACK_TO_DASHBOARD
+        <Link to="/" className="text-[10px] font-mono text-accent-secondary hover:underline">
+          &lt; Back to home
         </Link>
       </header>
-      <main className="w-full max-w-2xl glass-panel p-8 md:p-12 border-slate-800/80">
-        <h1 className="text-2xl md:text-3xl font-display font-semibold text-white tracking-wide mb-6">
+      <main className="w-full max-w-2xl technical-panel p-8 md:p-12 shadow-technical rounded bg-surface-raised">
+        <h1 className="text-xl md:text-2xl font-semibold text-primary tracking-wide mb-6">
           PRIVACY STATEMENT
         </h1>
-        <p className="text-sm text-slate-400 font-mono mb-8">
-          LAST_UPDATED: 2026-06-13
+        <p className="text-[10px] text-secondary/60 mb-8">
+          Last Updated: June 13, 2026
         </p>
 
-        <section className="space-y-8 text-sm leading-relaxed text-slate-300">
+        <section className="space-y-8 text-[11px] leading-relaxed text-secondary">
           <div>
-            <h2 className="text-md font-semibold text-cyber-blue uppercase tracking-wider mb-2">
+            <h2 className="text-xs font-semibold text-accent-secondary uppercase tracking-wider mb-2">
               Data Processing
             </h2>
             <p>
@@ -31,7 +31,7 @@ export function PrivacyPage() {
           </div>
 
           <div>
-            <h2 className="text-md font-semibold text-cyber-blue uppercase tracking-wider mb-2">
+            <h2 className="text-xs font-semibold text-accent-secondary uppercase tracking-wider mb-2">
               Third Party Services
             </h2>
             <p>
@@ -40,7 +40,7 @@ export function PrivacyPage() {
           </div>
 
           <div>
-            <h2 className="text-md font-semibold text-cyber-blue uppercase tracking-wider mb-2">
+            <h2 className="text-xs font-semibold text-accent-secondary uppercase tracking-wider mb-2">
               Browser Storage
             </h2>
             <p>

@@ -3,15 +3,16 @@ import { BufferGeometry, Float32BufferAttribute, Color } from 'three';
 import { useExplorerStore } from '@/stores/explorer';
 
 const NODE_COLORS: Record<string, string> = {
-  component: '#00d4ff',
-  util: '#7c3aed',
-  store: '#ff6b35',
-  style: '#ec4899',
-  config: '#94a3b8',
-  test: '#22c55e',
-  entry: '#ffffff',
-  unknown: '#64748b',
+  entry: '#ECE9E1',
+  component: '#A8AF86',
+  util: '#ECE9E1',
+  store: '#E3C78A',
+  style: '#97958E',
+  config: '#6E6B64',
+  test: '#A8AF86',
+  unknown: '#6E6B64',
 };
+
 
 export function DependencyLines() {
   const graph = useExplorerStore((s) => s.graph);
@@ -40,15 +41,15 @@ export function DependencyLines() {
       const [tx, ty, tz] = targetNode.position;
 
       // Determine edge highlighting
-      let opacityFactor = 0.2;
+      let opacityFactor = 0.08;
       const isConnectedToSelection = selectedNode && (edge.source === selectedNode.id || edge.target === selectedNode.id);
       const isAIHighlighted = highlightedEdges.has(`${edge.source}\0${edge.target}`) || highlightedEdges.has(`${edge.target}\0${edge.source}`);
 
       if (isConnectedToSelection || isAIHighlighted) {
-        opacityFactor = 1.0;
+        opacityFactor = 0.7;
       } else if (selectedNode) {
         // Dim other lines when a specific node is highlighted
-        opacityFactor = 0.04;
+        opacityFactor = 0.01;
       }
 
       posList.push(sx, sy, sz, tx, ty, tz);

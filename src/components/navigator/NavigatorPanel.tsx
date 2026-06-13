@@ -144,9 +144,9 @@ export function NavigatorPanel() {
       <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 pointer-events-auto">
         <button
           onClick={toggleChat}
-          className="flex items-center gap-2 px-5 py-3 bg-cyber-blue/15 hover:bg-cyber-blue/30 border border-cyber-blue text-white rounded-full font-mono text-xs uppercase tracking-wider shadow-neon-blue transition-all"
+          className="flex items-center gap-2 px-5 py-2.5 bg-accent-primary/10 hover:bg-accent-primary/20 border border-accent-primary/40 text-primary rounded font-mono text-xs tracking-wider transition-colors"
         >
-          <MessageSquare size={14} className="text-cyber-blue" />
+          <MessageSquare size={13} className="text-accent-primary" />
           <span>AI Navigator</span>
         </button>
       </div>
@@ -155,15 +155,15 @@ export function NavigatorPanel() {
 
   return (
     <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 w-full max-w-xl px-4 pointer-events-auto animate-slide-up">
-      <div className="glass-panel-heavy border-cyber-blue/20 shadow-neon-blue rounded-lg p-4 font-mono text-xs text-slate-300">
-        <div className="flex justify-between items-center border-b border-slate-800 pb-2 mb-3">
-          <div className="flex items-center gap-1.5 text-cyber-blue font-bold tracking-wider">
-            <Terminal size={14} />
-            <span>AI SPACIAL NAVIGATOR</span>
+      <div className="technical-panel rounded shadow-technical p-4 font-mono text-xs text-secondary bg-surface-raised/95">
+        <div className="flex justify-between items-center border-b border-primary/5 pb-2 mb-3">
+          <div className="flex items-center gap-1.5 text-accent-secondary font-medium tracking-wider">
+            <Terminal size={13} />
+            <span>AI SPATIAL NAVIGATOR</span>
           </div>
           <button
             onClick={toggleChat}
-            className="text-slate-500 hover:text-white transition-colors"
+            className="text-secondary/60 hover:text-primary transition-colors"
           >
             <X size={14} />
           </button>
@@ -172,16 +172,16 @@ export function NavigatorPanel() {
         {/* Message logs */}
         <div
           ref={scrollRef}
-          className="h-48 overflow-y-auto mb-3 space-y-3 bg-black/40 border border-slate-900 rounded p-3"
+          className="h-48 overflow-y-auto mb-3 space-y-3 bg-void border border-primary/5 rounded p-3"
         >
           {chatHistory.length === 0 ? (
-            <div className="text-center py-10 text-slate-600">
+            <div className="text-center py-10 text-secondary/40 text-[10px]">
               {aiAvailable === false ? (
-                <span className="text-cyber-red">
-                  NAVIGATOR OFFLINE (SET GEMINI_API_KEY TO ACTIVATE)
+                <span className="text-danger font-semibold uppercase">
+                  Navigator offline (requires server GEMINI_API_KEY)
                 </span>
               ) : (
-                <span>ASK ME "TAKE ME TO AUTH" OR "SHOW DANGEROUS FILES"</span>
+                <span>Ask the Navigator e.g. "Take me to auth modules" or "Explain server/index.ts"</span>
               )}
             </div>
           ) : (
@@ -191,7 +191,7 @@ export function NavigatorPanel() {
                 className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}
               >
                 <div
-                  className={`max-w-[85%] rounded px-3 py-2 leading-relaxed ${msg.role === 'user' ? 'bg-cyber-blue/10 border border-cyber-blue/20 text-white' : 'bg-slate-900/60 border border-slate-800 text-slate-300'}`}
+                  className={`max-w-[85%] rounded px-3 py-2 leading-relaxed ${msg.role === 'user' ? 'bg-accent-primary/10 border border-accent-primary/20 text-primary' : 'bg-surface-secondary/60 border border-primary/5 text-secondary'}`}
                 >
                   <div>{msg.content}</div>
 
@@ -200,7 +200,7 @@ export function NavigatorPanel() {
                     <button
                       key={j}
                       onClick={() => executeAction(action)}
-                      className="mt-2 flex items-center gap-1 text-[10px] text-cyber-blue border border-cyber-blue/30 px-2 py-0.5 rounded hover:bg-cyber-blue/20 transition-all font-semibold"
+                      className="mt-2 flex items-center gap-1 text-[9px] text-accent-selected border border-accent-selected/30 px-2 py-0.5 rounded hover:bg-accent-selected/10 transition-all"
                     >
                       <ArrowUpRight size={10} />
                       {action.message}
@@ -211,9 +211,9 @@ export function NavigatorPanel() {
             ))
           )}
           {isLoading && (
-            <div className="flex items-center gap-2 text-cyber-blue animate-pulse">
-              <span className="w-1.5 h-1.5 rounded-full bg-cyber-blue animate-ping" />
-              <span>NAVIGATOR PROCESSING COGNITIVE MATRIX...</span>
+            <div className="flex items-center gap-2 text-accent-selected animate-pulse text-[10px]">
+              <span className="w-1.5 h-1.5 rounded-full bg-accent-selected animate-ping" />
+              <span>Analyzing codebase structure...</span>
             </div>
           )}
         </div>
@@ -222,16 +222,16 @@ export function NavigatorPanel() {
         <form onSubmit={handleSubmit} className="flex gap-2">
           <input
             type="text"
-            placeholder={aiAvailable === false ? 'Navigator Offline...' : 'Ask the AI Navigator...'}
+            placeholder={aiAvailable === false ? 'Navigator Offline...' : 'Ask about this architecture...'}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             disabled={isLoading || aiAvailable === false}
-            className="flex-1 px-3 py-2 bg-black/55 border border-slate-800 focus:border-cyber-blue text-white rounded font-mono text-xs outline-none transition-colors disabled:opacity-50"
+            className="flex-1 px-3 py-2 bg-void border border-primary/10 focus:border-accent-selected/50 text-primary rounded font-mono text-xs outline-none transition-colors disabled:opacity-50"
           />
           <button
             type="submit"
             disabled={isLoading || !input.trim() || aiAvailable === false}
-            className="px-4 py-2 bg-cyber-blue/15 hover:bg-cyber-blue/30 border border-cyber-blue text-white rounded font-mono text-xs uppercase tracking-wider transition-colors disabled:opacity-50"
+            className="px-4 py-2 bg-accent-primary/15 hover:bg-accent-primary/25 border border-accent-primary/30 text-primary rounded font-mono text-xs transition-colors disabled:opacity-50"
           >
             <Send size={12} />
           </button>
@@ -241,3 +241,4 @@ export function NavigatorPanel() {
   );
 }
 export default NavigatorPanel;
+

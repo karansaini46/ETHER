@@ -5,12 +5,18 @@
 @tailwind utilities;
 
 :root {
-  --color-void: #020204;
-  --color-dark: #0a0a0f;
-  --color-cyan: #00d4ff;
-  --color-purple: #7c3aed;
+  --color-void: #090909;
+  --color-surface-raised: #111111;
+  --color-surface-secondary: #171715;
+  --color-text-primary: #ECE9E1;
+  --color-text-secondary: #97958E;
+  --color-border-hairline: rgba(236, 233, 225, 0.12);
+  --color-accent-primary: #C56A3A;
+  --color-accent-secondary: #A8AF86;
+  --color-accent-selected: #E3C78A;
+  --color-danger: #C6504B;
   
-  color: #e2e8f0;
+  color: var(--color-text-primary);
   background: var(--color-void);
   font-family: 'Inter', system-ui, sans-serif;
   text-rendering: optimizeLegibility;
@@ -27,60 +33,87 @@ body {
 
 /* Custom Scrollbar styling */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 4px;
+  height: 4px;
 }
 ::-webkit-scrollbar-track {
-  background: rgba(10, 10, 15, 0.5);
+  background: var(--color-void);
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(0, 212, 255, 0.2);
-  border-radius: 3px;
+  background: var(--color-border-hairline);
+  border-radius: 2px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 212, 255, 0.4);
+  background: var(--color-text-secondary);
 }
 
-/* Glassmorphism panel styles */
-.glass-panel {
-  border: 1px solid rgba(0, 212, 255, 0.15);
-  background: rgba(10, 10, 15, 0.82);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+/* Technical Panels */
+.technical-panel {
+  border: 1px solid var(--color-border-hairline);
+  background: var(--color-surface-raised);
 }
 
-.glass-panel-heavy {
-  border: 1px solid rgba(124, 58, 237, 0.25);
-  background: rgba(8, 8, 12, 0.95);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
+.technical-panel-secondary {
+  border: 1px solid var(--color-border-hairline);
+  background: var(--color-surface-secondary);
 }
 
-.glass-input {
-  border: 1px solid rgba(0, 212, 255, 0.2);
-  background: rgba(2, 2, 4, 0.6);
-  color: #ffffff;
-  transition: all 0.3s ease;
+.technical-input {
+  border: 1px solid var(--color-border-hairline);
+  background: rgba(9, 9, 9, 0.8);
+  color: var(--color-text-primary);
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
 }
 
-.glass-input:focus {
-  border-color: rgba(0, 212, 255, 0.6);
-  box-shadow: 0 0 10px rgba(0, 212, 255, 0.25);
+.technical-input:focus {
+  border-color: var(--color-accent-selected);
   outline: none;
 }
 
-/* JetBrains Node label inside 3D canvas (fallback / 2D overlays) */
+/* Monospace small labels */
+.mono-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--color-text-secondary);
+}
+
+/* File Node labels inside 3D canvas */
 .galaxy-node-label {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
-  color: #e2e8f0;
+  font-size: 10px;
+  color: var(--color-text-primary);
   pointer-events: none;
   white-space: nowrap;
-  background: rgba(2, 2, 4, 0.75);
-  padding: 2px 6px;
-  border-radius: 4px;
-  border: 1px solid rgba(0, 212, 255, 0.2);
+  background: var(--color-surface-secondary);
+  padding: 3px 6px;
+  border-radius: 2px;
+  border: 1px solid var(--color-border-hairline);
+}
+
+/* Fine technical grid pattern background */
+.tech-grid {
+  background-size: 40px 40px;
+  background-image: 
+    linear-gradient(to right, rgba(236, 233, 225, 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(236, 233, 225, 0.03) 1px, transparent 1px);
+}
+
+/* Subtle film grain overlay */
+.film-grain {
+  position: relative;
+}
+.film-grain::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0.02;
+  pointer-events: none;
+  z-index: 9999;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
 }
 
 /* Reduced motion considerations */

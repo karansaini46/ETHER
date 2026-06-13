@@ -42,18 +42,18 @@ export function SearchCommand() {
   };
 
   return (
-    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-6">
-      <div className="w-full max-w-lg glass-panel-heavy border-cyber-blue/30 shadow-neon-blue rounded-lg p-6 font-mono">
-        <div className="flex justify-between items-center mb-4 border-b border-slate-800 pb-3">
-          <div className="flex items-center gap-2 text-xs text-cyber-blue font-bold tracking-wider">
-            <Search size={14} />
-            <span>SEARCH COGNITIVE DATABASE</span>
+    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-6">
+      <div className="w-full max-w-lg technical-panel shadow-technical rounded p-6 font-mono bg-surface-raised/95">
+        <div className="flex justify-between items-center mb-4 border-b border-primary/5 pb-3">
+          <div className="flex items-center gap-2 text-[10px] text-accent-secondary font-medium tracking-wider">
+            <Search size={12} />
+            <span>SEARCH REPOSITORY FILES</span>
           </div>
           <button
             onClick={() => setSearchOpen(false)}
-            className="text-slate-500 hover:text-white transition-colors"
+            className="text-secondary hover:text-primary transition-colors"
           >
-            <X size={16} />
+            <X size={14} />
           </button>
         </div>
 
@@ -63,7 +63,7 @@ export function SearchCommand() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           autoFocus
-          className="w-full px-4 py-3 bg-black/55 border border-slate-800 focus:border-cyber-blue text-white rounded font-mono text-sm shadow-inner transition-colors outline-none"
+          className="w-full px-4 py-3 bg-void border border-primary/10 focus:border-accent-selected/50 text-primary rounded font-mono text-xs shadow-inner transition-colors outline-none"
         />
 
         {query && (
@@ -73,20 +73,20 @@ export function SearchCommand() {
                 <button
                   key={node.id}
                   onClick={() => handleSelect(node)}
-                  className="w-full flex items-center justify-between p-3 bg-slate-950/40 hover:bg-cyber-blue/10 border border-slate-900 hover:border-cyber-blue/40 rounded text-left text-xs text-slate-300 hover:text-white transition-all"
+                  className="w-full flex items-center justify-between p-3 bg-void hover:bg-surface-secondary border border-primary/5 hover:border-accent-selected/35 rounded text-left text-xs text-secondary hover:text-primary transition-all"
                 >
                   <div className="truncate pr-4">
-                    <div className="font-semibold">{node.label}</div>
-                    <div className="text-[10px] text-slate-500 truncate">{node.id}</div>
+                    <div className="font-semibold text-primary/90">{node.label}</div>
+                    <div className="text-[10px] text-secondary/60 truncate">{node.id}</div>
                   </div>
-                  <div className="text-[10px] uppercase px-1.5 py-0.5 bg-slate-900 border border-slate-800 rounded font-bold">
+                  <div className="text-[9px] uppercase px-1.5 py-0.5 bg-surface-secondary border border-primary/5 rounded font-medium text-secondary">
                     {node.language}
                   </div>
                 </button>
               ))
             ) : (
-              <div className="text-center py-6 text-xs text-slate-600">
-                NO COORDINATES FOUND FOR "{query}"
+              <div className="text-center py-6 text-xs text-secondary/40">
+                NO FILES FOUND FOR "{query}"
               </div>
             )}
           </div>
@@ -96,3 +96,4 @@ export function SearchCommand() {
   );
 }
 export default SearchCommand;
+

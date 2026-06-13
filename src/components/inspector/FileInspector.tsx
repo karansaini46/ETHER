@@ -63,15 +63,15 @@ export function FileInspector() {
 
   return (
     <div className="absolute right-0 top-16 z-20 w-80 max-h-[80vh] overflow-y-auto pointer-events-auto p-4 animate-slide-up">
-      <div className="glass-panel border-slate-800 rounded-lg p-5 font-mono text-xs text-slate-300">
-        <div className="flex justify-between items-center border-b border-slate-800 pb-2 mb-4">
-          <div className="flex items-center gap-1.5 text-cyber-blue font-bold tracking-wider">
-            <FileCode size={14} />
+      <div className="technical-panel rounded shadow-technical p-5 font-mono text-xs text-secondary bg-surface-raised/95">
+        <div className="flex justify-between items-center border-b border-primary/5 pb-2 mb-4">
+          <div className="flex items-center gap-1.5 text-accent-secondary font-medium tracking-wider">
+            <FileCode size={13} />
             <span>FILE INSPECTOR</span>
           </div>
           <button
             onClick={() => selectNode(null)}
-            className="text-slate-500 hover:text-white transition-colors"
+            className="text-secondary/60 hover:text-primary transition-colors"
           >
             <X size={14} />
           </button>
@@ -79,82 +79,82 @@ export function FileInspector() {
 
         <div className="space-y-4">
           <div>
-            <div className="text-[10px] text-slate-500 uppercase">File Path</div>
-            <div className="text-white font-semibold break-all leading-relaxed">{selectedNode.id}</div>
+            <div className="text-[9px] text-secondary/50 uppercase tracking-wider mb-0.5">File Path</div>
+            <div className="text-primary font-medium break-all leading-relaxed">{selectedNode.id}</div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 bg-black/30 border border-slate-900 rounded p-2.5">
+          <div className="grid grid-cols-2 gap-3 bg-void border border-primary/5 rounded p-2.5">
             <div>
-              <div className="text-[10px] text-slate-500">SIZE</div>
-              <div className="text-white font-bold">{formatSize(selectedNode.size)}</div>
+              <div className="text-[9px] text-secondary/50 tracking-wider">SIZE</div>
+              <div className="text-primary font-semibold">{formatSize(selectedNode.size)}</div>
             </div>
             <div>
-              <div className="text-[10px] text-slate-500">LINES</div>
-              <div className="text-white font-bold">{selectedNode.lineCount}</div>
+              <div className="text-[9px] text-secondary/50 tracking-wider">LINES</div>
+              <div className="text-primary font-semibold">{selectedNode.lineCount}</div>
             </div>
             <div>
-              <div className="text-[10px] text-slate-500">TYPE</div>
-              <div className="text-white font-bold uppercase">{selectedNode.type}</div>
+              <div className="text-[9px] text-secondary/50 tracking-wider">TYPE</div>
+              <div className="text-primary font-semibold uppercase">{selectedNode.type}</div>
             </div>
             <div>
-              <div className="text-[10px] text-slate-500">RISK</div>
-              <div className={`font-bold uppercase ${selectedNode.riskLevel === 'high' ? 'text-cyber-red' : selectedNode.riskLevel === 'medium' ? 'text-cyber-amber' : 'text-cyber-green'}`}>
+              <div className="text-[9px] text-secondary/50 tracking-wider">RISK</div>
+              <div className={`font-semibold uppercase ${selectedNode.riskLevel === 'high' ? 'text-danger' : selectedNode.riskLevel === 'medium' ? 'text-accent-primary' : 'text-accent-secondary'}`}>
                 {selectedNode.riskLevel}
               </div>
             </div>
           </div>
 
           <div>
-            <div className="text-[10px] text-slate-500 uppercase mb-1.5">Direct Imports ({dependencies.imports.length})</div>
+            <div className="text-[9px] text-secondary/50 uppercase tracking-wider mb-1.5">Direct Imports ({dependencies.imports.length})</div>
             {dependencies.imports.length > 0 ? (
-              <div className="space-y-1 max-h-24 overflow-y-auto border border-slate-900 rounded p-1">
+              <div className="space-y-1 max-h-24 overflow-y-auto border border-primary/5 rounded p-1.5 bg-void/50">
                 {dependencies.imports.map((imp) => (
                   <button
                     key={imp.id}
                     onClick={() => selectNode(imp)}
-                    className="w-full text-left truncate hover:text-cyber-blue py-0.5"
+                    className="w-full text-left truncate hover:text-accent-selected py-0.5 text-secondary/80 hover:text-primary transition-colors block"
                   >
                     &gt; {imp.label}
                   </button>
                 ))}
               </div>
             ) : (
-              <div className="text-[10px] text-slate-600">NONE</div>
+              <div className="text-[9px] text-secondary/30">NONE</div>
             )}
           </div>
 
           <div>
-            <div className="text-[10px] text-slate-500 uppercase mb-1.5">Imported By ({dependencies.importedBy.length})</div>
+            <div className="text-[9px] text-secondary/50 uppercase tracking-wider mb-1.5">Imported By ({dependencies.importedBy.length})</div>
             {dependencies.importedBy.length > 0 ? (
-              <div className="space-y-1 max-h-24 overflow-y-auto border border-slate-900 rounded p-1">
+              <div className="space-y-1 max-h-24 overflow-y-auto border border-primary/5 rounded p-1.5 bg-void/50">
                 {dependencies.importedBy.map((imp) => (
                   <button
                     key={imp.id}
                     onClick={() => selectNode(imp)}
-                    className="w-full text-left truncate hover:text-cyber-blue py-0.5"
+                    className="w-full text-left truncate hover:text-accent-selected py-0.5 text-secondary/80 hover:text-primary transition-colors block"
                   >
                     &gt; {imp.label}
                   </button>
                 ))}
               </div>
             ) : (
-              <div className="text-[10px] text-slate-600">NONE</div>
+              <div className="text-[9px] text-secondary/30">NONE</div>
             )}
           </div>
 
-          <div className="flex gap-2 pt-2 border-t border-slate-900">
+          <div className="flex gap-2 pt-2 border-t border-primary/5">
             <button
               onClick={handleTrace}
-              className="flex-1 flex items-center justify-center gap-1 py-2 bg-cyber-blue/15 hover:bg-cyber-blue/25 border border-cyber-blue/30 text-white rounded text-[10px] uppercase font-bold tracking-wider transition-colors"
+              className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-accent-primary/10 hover:bg-accent-primary/20 border border-accent-primary/35 text-primary rounded text-[9px] font-medium tracking-wider transition-colors"
             >
-              <Network size={12} />
+              <Network size={11} />
               Trace path
             </button>
             <button
               onClick={handleAskAI}
-              className="flex-1 flex items-center justify-center gap-1 py-2 bg-cyber-purple/15 hover:bg-cyber-purple/25 border border-cyber-purple/30 text-white rounded text-[10px] uppercase font-bold tracking-wider transition-colors"
+              className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-accent-secondary/15 hover:bg-accent-secondary/25 border border-accent-secondary/30 text-primary rounded text-[9px] font-medium tracking-wider transition-colors"
             >
-              <MessageSquare size={12} />
+              <MessageSquare size={11} />
               Ask navigator
             </button>
           </div>
@@ -164,3 +164,4 @@ export function FileInspector() {
   );
 }
 export default FileInspector;
+
