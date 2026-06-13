@@ -17,6 +17,9 @@ export class NodeRaycaster {
   private readonly canvas: HTMLCanvasElement
   private readonly camera: PerspectiveCamera
   private readonly getMeshes: () => InstancedMesh[]
+  private pointerDownX = 0
+  private pointerDownY = 0
+  private pointerDownTime = 0
   private disposed = false
 
   constructor(
@@ -27,6 +30,7 @@ export class NodeRaycaster {
     this.canvas = canvas
     this.camera = camera
     this.getMeshes = getMeshes
+    canvas.addEventListener('pointerdown', this.handlePointerDown, true)
     canvas.addEventListener('click', this.handleClick, true)
   }
 
@@ -36,15 +40,27 @@ export class NodeRaycaster {
     }
 
     this.disposed = true
+    this.canvas.removeEventListener('pointerdown', this.handlePointerDown, true)
     this.canvas.removeEventListener('click', this.handleClick, true)
   }
 
+  private readonly handlePointerDown = (event: PointerEvent): void => {
+    this.pointerDownX = event.clientX
+    this.pointerDownY = event.clientY
+    this.pointerDownTime = Date.now()
+  }
+
   private readonly handleClick = (event: MouseEvent): void => {
-    if (
-      this.disposed ||
-      event.button !== 0 ||
-      document.pointerLockElement !== null
-    ) {
+    if (this.disposed || event.button !== 0) {
+      return
+    }
+
+    const clickDuration = Date.now() - this.pointerDownTime
+    const dx = event.clientX - this.pointerDownX
+    const dy = event.clientY - this.pointerDownY
+    const dragDistance = Math.sqrt(dx * dx + dy * dy)
+
+    if (dragDistance > 6 || clickDuration > 300) {
       return
     }
 

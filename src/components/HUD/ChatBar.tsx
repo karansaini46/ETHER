@@ -116,7 +116,27 @@ export function ChatBar() {
     <div className="pointer-events-auto absolute bottom-6 left-1/2 flex w-[min(680px,calc(100%-2rem))] -translate-x-1/2 flex-col gap-3">
       {/* Scrollable Chat History Panel */}
       {chatHistory.length > 0 && (
-        <div className="glass-panel flex max-h-[280px] flex-col gap-3 overflow-y-auto rounded-2xl p-4 scrollbar-thin">
+        <div className="glass-panel flex max-h-[280px] flex-col gap-3 overflow-y-auto rounded-2xl p-4 scrollbar-thin relative">
+          {/* Header Bar with Close Button */}
+          <div className="flex items-center justify-between border-b border-slate-700/40 pb-2 mb-1">
+            <span className="font-label text-[10px] uppercase tracking-wider font-semibold text-slate-500">
+              AI Navigator Log
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                inputRef.current?.blur()
+                actions.closeChat()
+              }}
+              className="text-slate-500 hover:text-slate-300 transition-colors p-1"
+              title="Close Chat"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
           {chatHistory.map((msg, index) => (
             <div
               key={index}
@@ -188,6 +208,18 @@ export function ChatBar() {
           disabled={isLoading}
         >
           Send
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            inputRef.current?.blur()
+            actions.closeChat()
+          }}
+          className="font-label rounded-xl border border-slate-700/60 bg-slate-800/40 px-3.5 py-2 text-sm font-semibold text-slate-400 transition-colors hover:bg-slate-800/80 hover:text-slate-200"
+          title="Close Chat (Esc)"
+        >
+          Close
         </button>
       </form>
     </div>

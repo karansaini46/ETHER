@@ -7,6 +7,7 @@ import {
   MeshBasicMaterial,
   PlaneGeometry,
   Vector3,
+  type Camera,
 } from 'three'
 
 interface Particle {
@@ -26,7 +27,7 @@ export class ParticleSystem {
   private poolPointer = 0
 
   constructor() {
-    const geometry = new PlaneGeometry(0.15, 0.15)
+    const geometry = new PlaneGeometry(1.2, 1.2)
     const material = new MeshBasicMaterial({
       color: 0xffffff,
       transparent: true,
@@ -71,21 +72,23 @@ export class ParticleSystem {
       if (!p.active) {
         p.active = true
         p.age = 0
-        p.maxAge = 0.8 + Math.random() * 0.4
-        p.position.copy(position)
+        p.maxAge = 0.8 + Math.random() * 0.5
         p.color.copy(color)
 
         const theta = Math.random() * Math.PI * 2
         const phi = Math.acos(Math.random() * 2 - 1)
-        const speed = 10 + Math.random() * 25
+        const speed = 12 + Math.random() * 28
 
-        p.velocity
-          .set(
-            Math.sin(phi) * Math.cos(theta),
-            Math.sin(phi) * Math.sin(theta),
-            Math.cos(phi),
-          )
-          .multiplyScalar(speed)
+        const dir = new Vector3(
+          Math.sin(phi) * Math.cos(theta),
+          Math.sin(phi) * Math.sin(theta),
+          Math.cos(phi),
+        )
+
+        p.velocity.copy(dir).multiplyScalar(speed)
+        
+        // Spawn slightly offset from center to clear the larger 3D server box casing
+        p.position.copy(position).addScaledVector(dir, 1.5)
 
         allocated++
       }
@@ -93,7 +96,7 @@ export class ParticleSystem {
     this.poolPointer = (this.poolPointer + allocated) % MAX_PARTICLES
   }
 
-  update(delta: number): void {
+  update(delta: number, camera: Camera): void {
     const matrix = new Matrix4()
     const scale = new Vector3()
     let needsUpdate = false
@@ -102,7 +105,7 @@ export class ParticleSystem {
       const p = this.particles[i]
 
       if (p.active) {
-        p.velocity.multiplyScalar(0.95)
+        p.velocity.multiplyScalar(0.94)
         p.position.addScaledVector(p.velocity, delta)
         p.age += delta
 
@@ -113,14 +116,16 @@ export class ParticleSystem {
           needsUpdate = true
         } else {
           const lifeRatio = p.age / p.maxAge
-          const particleScale = 1.0 - lifeRatio
+          const particleScale = (1.0 - lifeRatio) * 1.5
           const intensity = 1.0 - lifeRatio
 
           scale.set(particleScale, particleScale, particleScale)
-          matrix.compose(p.position, this.mesh.quaternion, scale)
+          
+          // Force particles to billboard and face the camera directly
+          matrix.compose(p.position, camera.quaternion, scale)
           this.mesh.setMatrixAt(i, matrix)
 
-          const c = p.color.clone().multiplyScalar(intensity * 1.5)
+          const c = p.color.clone().multiplyScalar(intensity * 2.0)
           this.mesh.setColorAt(i, c)
           needsUpdate = true
         }

@@ -41,10 +41,12 @@ export class CameraRig {
   private readonly cameraQuaternion = new Quaternion()
   private yaw = 0
   private pitch = 0
-  private pendingMouseX = 0
-  private pendingMouseY = 0
   private flight: Flight | null = null
   private disposed = false
+
+  private isDragging = false
+  private lastMouseX = 0
+  private lastMouseY = 0
 
   constructor(camera: PerspectiveCamera, canvas: HTMLCanvasElement) {
     this.camera = camera
@@ -54,9 +56,10 @@ export class CameraRig {
     this.pitch = rotation.x
     this.yaw = rotation.y
 
-    canvas.addEventListener('click', this.handleCanvasClick)
-    document.addEventListener('pointerlockchange', this.handlePointerLockChange)
-    document.addEventListener('mousemove', this.handleMouseMove)
+    canvas.addEventListener('pointerdown', this.handlePointerDown)
+    canvas.addEventListener('wheel', this.handleWheel, { passive: false })
+    document.addEventListener('pointermove', this.handlePointerMove)
+    document.addEventListener('pointerup', this.handlePointerUp)
     document.addEventListener('keydown', this.handleKeyDown)
     document.addEventListener('keyup', this.handleKeyUp)
     window.addEventListener('blur', this.clearInput)
@@ -73,14 +76,6 @@ export class CameraRig {
       this.updateFlight(deltaSeconds * 1_000)
       return
     }
-
-    if (!this.isPointerLocked()) {
-      this.pendingMouseX = 0
-      this.pendingMouseY = 0
-      return
-    }
-
-    this.updateRotation()
 
     if (isEditableElement(document.activeElement)) {
       this.pressedKeys.clear()
@@ -108,8 +103,6 @@ export class CameraRig {
     const safeDuration = Number.isFinite(duration)
       ? Math.max(0, duration)
       : 0
-    this.pendingMouseX = 0
-    this.pendingMouseY = 0
     this.pressedKeys.clear()
 
     if (safeDuration === 0) {
@@ -123,7 +116,6 @@ export class CameraRig {
         this.pitch = rotation.x
         this.yaw = rotation.y
       }
-      this.releasePointerLock()
       actualOnComplete?.()
       return
     }
@@ -157,34 +149,55 @@ export class CameraRig {
     this.disposed = true
     this.pressedKeys.clear()
     this.flight = null
-    this.pendingMouseX = 0
-    this.pendingMouseY = 0
-    this.canvas.removeEventListener('click', this.handleCanvasClick)
-    document.removeEventListener(
-      'pointerlockchange',
-      this.handlePointerLockChange,
-    )
-    document.removeEventListener('mousemove', this.handleMouseMove)
+    this.isDragging = false
+
+    this.canvas.removeEventListener('pointerdown', this.handlePointerDown)
+    this.canvas.removeEventListener('wheel', this.handleWheel)
+    document.removeEventListener('pointermove', this.handlePointerMove)
+    document.removeEventListener('pointerup', this.handlePointerUp)
     document.removeEventListener('keydown', this.handleKeyDown)
     document.removeEventListener('keyup', this.handleKeyUp)
     window.removeEventListener('blur', this.clearInput)
-
-    if (this.isPointerLocked()) {
-      document.exitPointerLock()
-    }
   }
 
-  private updateRotation(): void {
-    if (this.pendingMouseX === 0 && this.pendingMouseY === 0) {
+  private readonly handlePointerDown = (event: PointerEvent): void => {
+    if (this.disposed || event.button !== 0 || this.flight) {
+      return
+    }
+    this.isDragging = true
+    this.lastMouseX = event.clientX
+    this.lastMouseY = event.clientY
+  }
+
+  private readonly handlePointerMove = (event: PointerEvent): void => {
+    if (this.disposed || !this.isDragging || this.flight) {
       return
     }
 
-    this.yaw -= this.pendingMouseX * MOUSE_SENSITIVITY
-    this.pitch -= this.pendingMouseY * MOUSE_SENSITIVITY
+    const deltaX = event.clientX - this.lastMouseX
+    const deltaY = event.clientY - this.lastMouseY
+    this.lastMouseX = event.clientX
+    this.lastMouseY = event.clientY
+
+    this.yaw -= deltaX * MOUSE_SENSITIVITY
+    this.pitch -= deltaY * MOUSE_SENSITIVITY
     this.pitch = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, this.pitch))
-    this.pendingMouseX = 0
-    this.pendingMouseY = 0
     this.camera.rotation.set(this.pitch, this.yaw, 0, 'YXZ')
+  }
+
+  private readonly handlePointerUp = (): void => {
+    this.isDragging = false
+  }
+
+  private readonly handleWheel = (event: WheelEvent): void => {
+    if (this.disposed || this.flight) {
+      return
+    }
+    event.preventDefault()
+
+    const dir = new Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion)
+    const zoomAmount = event.deltaY * 0.08
+    this.camera.position.addScaledVector(dir, -zoomAmount)
   }
 
   private updateMovement(deltaSeconds: number): void {
@@ -268,7 +281,6 @@ export class CameraRig {
       easedProgress,
     )
 
-    // Keep internal yaw and pitch in sync with the flight's rotation
     const rotation = new Euler().setFromQuaternion(
       this.camera.quaternion,
       'YXZ',
@@ -281,49 +293,11 @@ export class CameraRig {
     }
 
     this.flight = null
-    this.releasePointerLock()
     flight.onComplete?.()
   }
 
-  private readonly handleCanvasClick = (): void => {
-    if (this.disposed || this.isPointerLocked() || this.flight) {
-      return
-    }
-
-    try {
-      const lockRequest = this.canvas.requestPointerLock()
-
-      if (lockRequest instanceof Promise) {
-        lockRequest.catch(() => undefined)
-      }
-    } catch {
-      this.clearInput()
-    }
-  }
-
-  private readonly handlePointerLockChange = (): void => {
-    if (!this.isPointerLocked()) {
-      this.clearInput()
-    }
-  }
-
-  private readonly handleMouseMove = (event: MouseEvent): void => {
-    if (!this.isPointerLocked() || this.flight) {
-      return
-    }
-
-    this.pendingMouseX += event.movementX
-    this.pendingMouseY += event.movementY
-  }
-
   private readonly handleKeyDown = (event: KeyboardEvent): void => {
-    if (event.code === 'Escape' && this.isPointerLocked()) {
-      document.exitPointerLock()
-      return
-    }
-
     if (
-      !this.isPointerLocked() ||
       this.flight ||
       isEditableElement(document.activeElement)
     ) {
@@ -342,18 +316,7 @@ export class CameraRig {
 
   private readonly clearInput = (): void => {
     this.pressedKeys.clear()
-    this.pendingMouseX = 0
-    this.pendingMouseY = 0
-  }
-
-  private isPointerLocked(): boolean {
-    return document.pointerLockElement === this.canvas
-  }
-
-  private releasePointerLock(): void {
-    if (this.isPointerLocked()) {
-      document.exitPointerLock()
-    }
+    this.isDragging = false
   }
 }
 

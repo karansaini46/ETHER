@@ -1,6 +1,7 @@
 import {
   AdditiveBlending,
   AmbientLight,
+  BoxGeometry,
   BufferGeometry,
   Color,
   Float32BufferAttribute,
@@ -39,6 +40,8 @@ import {
   releaseNodeMaterials,
   retainNodeMaterials,
   updateNodeMaterialPulse,
+  updateNodeMaterialTime,
+  NODE_ICON_INDICES,
 } from './NodeMesh'
 import { CameraRig } from './CameraRig'
 import { NodeRaycaster } from './Raycaster'
@@ -149,6 +152,14 @@ export class Galaxy {
   private perfElement?: HTMLDivElement
   private frameCount = 0
   private lastPerfUpdateTime = 0
+
+  // Autopilot/surfing state
+  private isSurfing = false
+  private surfTimeoutId: number | null = null
+
+  // Edge animation resources
+  private edgeMaterial?: LineBasicMaterial
+  private edgePulseIntensity = 0.0
 
   private animationFrameId = 0
   private previousFrameTime = 0
@@ -289,6 +300,46 @@ export class Galaxy {
     })
     this.storeUnsubscribers.push(unsubChatHistory)
 
+    const handleToggleSurf = (event: Event) => {
+      const customEvent = event as CustomEvent<{ enabled: boolean }>
+      this.toggleSurfMode(customEvent.detail.enabled)
+    }
+    window.addEventListener('toggle-surf-mode', handleToggleSurf)
+    this.storeUnsubscribers.push(() => {
+      window.removeEventListener('toggle-surf-mode', handleToggleSurf)
+    })
+
+    const handleSupernova = () => {
+      const selectedNode = useStore.getState().selectedNode
+      if (selectedNode) {
+        const pos = new Vector3().fromArray(selectedNode.position)
+        const col = getNodeColor(selectedNode.type, selectedNode.hasIssue)
+        this.particles.burst(pos, col, 250)
+      }
+    }
+    window.addEventListener('supernova-burst', handleSupernova)
+    this.storeUnsubscribers.push(() => {
+      window.removeEventListener('supernova-burst', handleSupernova)
+    })
+
+    const handleSonarPing = () => {
+      const { graph } = useStore.getState()
+      if (!graph) return
+      
+      this.edgePulseIntensity = 1.0
+
+      for (let i = 0; i < Math.min(5, graph.nodes.length); i++) {
+        const randomNode = graph.nodes[Math.floor(Math.random() * graph.nodes.length)]
+        const pos = new Vector3().fromArray(randomNode.position)
+        const col = new Color(0x7c3aed).multiplyScalar(1.5)
+        this.particles.burst(pos, col, 50)
+      }
+    }
+    window.addEventListener('sonar-ping', handleSonarPing)
+    this.storeUnsubscribers.push(() => {
+      window.removeEventListener('sonar-ping', handleSonarPing)
+    })
+
     this.animationFrameId = requestAnimationFrame(this.animate)
   }
 
@@ -334,6 +385,7 @@ export class Galaxy {
     const pointsMaterial = new ShaderMaterial({
       vertexShader: LOD_POINTS_VERTEX_SHADER,
       fragmentShader: LOD_POINTS_FRAGMENT_SHADER,
+      vertexColors: true,
       transparent: true,
       depthWrite: false,
       blending: AdditiveBlending,
@@ -400,6 +452,11 @@ export class Galaxy {
       this.perfElement.remove()
     }
 
+    if (this.surfTimeoutId) {
+      clearTimeout(this.surfTimeoutId)
+      this.surfTimeoutId = null
+    }
+
     this.nodeRaycaster.dispose()
     this.cameraRig.dispose()
     this.resizeObserver.disconnect()
@@ -410,6 +467,53 @@ export class Galaxy {
     this.renderer.renderLists.dispose()
     this.composer.dispose()
     this.renderer.dispose()
+  }
+
+  toggleSurfMode(enabled: boolean): void {
+    if (this.isSurfing === enabled) return
+    this.isSurfing = enabled
+
+    if (this.surfTimeoutId) {
+      clearTimeout(this.surfTimeoutId)
+      this.surfTimeoutId = null
+    }
+
+    if (enabled) {
+      this.surfToNextNode()
+    }
+  }
+
+  private surfToNextNode(): void {
+    if (!this.isSurfing || this.disposed) return
+
+    const { graph } = useStore.getState()
+    if (!graph || graph.nodes.length === 0) return
+
+    const nodes = graph.nodes
+    const nextIndex = Math.floor(Math.random() * nodes.length)
+    const node = nodes[nextIndex]
+
+    const targetPos = new Vector3().fromArray(node.position)
+    const angle = Math.random() * Math.PI * 2
+    const offset = new Vector3(
+      Math.cos(angle) * 45,
+      20 + Math.random() * 15,
+      Math.sin(angle) * 45,
+    )
+    const cameraTarget = targetPos.clone().add(offset)
+
+    useStore.getState().actions.selectNode(node)
+
+    this.flyTo(cameraTarget, 3000, targetPos, () => {
+      if (this.isSurfing && !this.disposed) {
+        const color = getNodeColor(node.type, node.hasIssue)
+        this.particles.burst(targetPos, color, 120)
+
+        this.surfTimeoutId = window.setTimeout(() => {
+          this.surfToNextNode()
+        }, 3200)
+      }
+    })
   }
 
   private executeCommand(command: NavCommand): void {
@@ -466,10 +570,11 @@ export class Galaxy {
     this.previousFrameTime = time
     this.cameraRig.update(delta)
 
-    this.particles.update(delta)
+    this.particles.update(delta, this.camera)
 
     const pulse = 0.12 + (Math.sin(time * 0.004) + 1) * 0.08
     updateNodeMaterialPulse(pulse)
+    updateNodeMaterialTime(time * 0.001)
 
     for (const light of this.recentLights) {
       light.intensity = 0.35 + (Math.sin(time * 0.004) + 1) * 0.12
@@ -491,6 +596,11 @@ export class Galaxy {
       this.selectedRing.rotation.y += delta * 1.8
     } else {
       this.selectedRing.visible = false
+    }
+
+    if (this.edgeMaterial) {
+      this.edgePulseIntensity = Math.max(0, this.edgePulseIntensity - delta * 0.7)
+      this.edgeMaterial.opacity = 0.25 + this.edgePulseIntensity * 0.55
     }
 
     this.updateLOD()
@@ -537,8 +647,8 @@ export class Galaxy {
 
       const distance = position.distanceTo(this.cameraWorldPosition)
 
-      if (distance <= 150) {
-        // LOD 0 (Close): Sphere Mesh
+      if (distance <= 2000) {
+        // LOD 0 (Close): Solid Terminal Box Mesh
         scale.setScalar(nodeScale)
         matrix.compose(position, mesh.quaternion, scale)
         mesh.setMatrixAt(meshIndex, matrix)
@@ -554,7 +664,7 @@ export class Galaxy {
         mesh.setMatrixAt(meshIndex, matrix)
         meshesToUpdate.add(mesh)
 
-        const targetSize = 1.5 + nodeScale * 2.0
+        const targetSize = (2.0 + nodeScale * 3.0) * 8.0
         if (sizes[pointIndex] !== targetSize) {
           sizes[pointIndex] = targetSize
           pointsNeedUpdate = true
@@ -605,7 +715,7 @@ export class Galaxy {
     nodes: GraphNode[],
     allNodes: GraphNode[],
   ): void {
-    const geometry = new IcosahedronGeometry(1, 2)
+    const geometry = new BoxGeometry(3.5, 2.5, 0.8)
     const recentFlags = new Float32Array(nodes.length)
     const highlightedFlags = new Float32Array(nodes.length)
 
@@ -634,7 +744,6 @@ export class Galaxy {
       scale.setScalar(nodeScale)
       matrix.compose(position, mesh.quaternion, scale)
       mesh.setMatrixAt(index, matrix)
-      mesh.setColorAt(index, getNodeColor(type, node.hasIssue))
       recentFlags[index] = node.isRecent ? 1 : 0
       highlightedFlags[index] = 0
 
@@ -652,10 +761,6 @@ export class Galaxy {
     })
 
     mesh.instanceMatrix.needsUpdate = true
-
-    if (mesh.instanceColor) {
-      mesh.instanceColor.needsUpdate = true
-    }
 
     const recentAttribute = geometry.getAttribute('instanceRecent')
     recentAttribute.needsUpdate = true
@@ -721,9 +826,10 @@ export class Galaxy {
 
     const material = new LineBasicMaterial({
       vertexColors: true,
-      opacity: 0.35,
+      opacity: 0.25,
       transparent: true,
     })
+    this.edgeMaterial = material
     const lineSegments = new LineSegments(geometry, material)
 
     this.graphGeometries.add(geometry)
