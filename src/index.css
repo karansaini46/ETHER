@@ -1,66 +1,94 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --font-label: 'Space Grotesk', system-ui, sans-serif;
-  --font-data: 'JetBrains Mono', ui-monospace, monospace;
-  color: #f8fafc;
-  background: #020408;
-  font-family: var(--font-label);
-  font-synthesis: none;
+  --color-void: #020204;
+  --color-dark: #0a0a0f;
+  --color-cyan: #00d4ff;
+  --color-purple: #7c3aed;
+  
+  color: #e2e8f0;
+  background: var(--color-void);
+  font-family: 'Inter', system-ui, sans-serif;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-* {
-  box-sizing: border-box;
-}
-
-html,
-body,
-#root {
-  min-width: 320px;
-  min-height: 100%;
-  margin: 0;
-}
-
 body {
+  margin: 0;
   min-height: 100vh;
   overflow: hidden;
+  background-color: var(--color-void);
 }
 
-button,
-input,
-textarea {
-  font: inherit;
+/* Custom Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(10, 10, 15, 0.5);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 212, 255, 0.2);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 212, 255, 0.4);
 }
 
+/* Glassmorphism panel styles */
 .glass-panel {
-  border: 1px solid rgba(30, 45, 61, 0.8);
-  background: rgba(5, 13, 20, 0.85);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(0, 212, 255, 0.15);
+  background: rgba(10, 10, 15, 0.82);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
 }
 
-.font-label {
-  font-family: var(--font-label);
+.glass-panel-heavy {
+  border: 1px solid rgba(124, 58, 237, 0.25);
+  background: rgba(8, 8, 12, 0.95);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
 }
 
-.font-data {
-  font-family: var(--font-data);
+.glass-input {
+  border: 1px solid rgba(0, 212, 255, 0.2);
+  background: rgba(2, 2, 4, 0.6);
+  color: #ffffff;
+  transition: all 0.3s ease;
 }
 
-@keyframes spin-reverse {
-  from {
-    transform: rotate(360deg);
+.glass-input:focus {
+  border-color: rgba(0, 212, 255, 0.6);
+  box-shadow: 0 0 10px rgba(0, 212, 255, 0.25);
+  outline: none;
+}
+
+/* JetBrains Node label inside 3D canvas (fallback / 2D overlays) */
+.galaxy-node-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: #e2e8f0;
+  pointer-events: none;
+  white-space: nowrap;
+  background: rgba(2, 2, 4, 0.75);
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid rgba(0, 212, 255, 0.2);
+}
+
+/* Reduced motion considerations */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
-  to {
-    transform: rotate(0deg);
-  }
-}
-
-.animate-spin-reverse {
-  animation: spin-reverse 1.5s linear infinite;
 }

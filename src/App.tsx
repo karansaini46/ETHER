@@ -1,137 +1,49 @@
-import { useEffect, useRef } from 'react'
+import { Suspense, lazy } from 'react';
+import { Routes, Route } from 'react-router-dom';
+import { useWebGLSupport } from '@/hooks/useWebGLSupport';
+import { ErrorBoundary } from '@/components/feedback/ErrorBoundary';
+import { WebGLFallback } from '@/components/feedback/WebGLFallback';
 
-import { HUD } from '@/components/HUD/HUD'
-import { fetchCommits, fetchFileContent, fetchIssues, fetchRepoTree } from '@/lib/github'
-import { buildGraphInWorker } from '@/lib/workers/graph'
-import { useStore } from '@/store'
-import { Galaxy } from '@/three/Galaxy'
+// Lazy-loaded routes
+const LandingPage = lazy(() => import('@/routes/LandingPage'));
+const AnalysisPage = lazy(() => import('@/routes/AnalysisPage'));
+const ExplorerPage = lazy(() => import('@/routes/ExplorerPage'));
+const DemoPage = lazy(() => import('@/routes/DemoPage'));
+const SecurityPage = lazy(() => import('@/routes/SecurityPage'));
+const PrivacyPage = lazy(() => import('@/routes/PrivacyPage'));
+const NotFoundPage = lazy(() => import('@/routes/NotFoundPage'));
 
-function App() {
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const repo = useStore((state) => state.repo)
-  const actions = useStore((state) => state.actions)
-
-  useEffect(() => {
-    const canvas = canvasRef.current
-
-    if (!canvas) {
-      return
-    }
-
-    const galaxy = new Galaxy(canvas)
-
-    return () => {
-      galaxy.dispose()
-    }
-  }, [])
-
-  useEffect(() => {
-    if (!repo) {
-      return
-    }
-
-    const { owner, name } = repo
-    const controller = new AbortController()
-
-    async function loadRepository() {
-      try {
-        actions.setError(null)
-
-        // Phase 1: loading-tree
-        actions.setStatus('loading-tree')
-        const files = await fetchRepoTree(owner, name, controller.signal)
-
-        if (files.length === 0) {
-          throw new Error('No files found or repository is empty.')
-        }
-
-        const codeFiles = files.filter((file) =>
-          /\.(tsx?|jsx?|json|css|scss|html)$/i.test(file.path),
-        )
-
-        // Phase 2: loading-contents
-        actions.setStatus('loading-contents')
-        const contents = new Map<string, string>()
-
-        const chunkSize = 15
-        for (let index = 0; index < codeFiles.length; index += chunkSize) {
-          if (controller.signal.aborted) {
-            return
-          }
-
-          const chunk = codeFiles.slice(index, index + chunkSize)
-          await Promise.all(
-            chunk.map(async (file) => {
-              try {
-                const content = await fetchFileContent(
-                  owner,
-                  name,
-                  file.path,
-                  controller.signal,
-                )
-                contents.set(file.path, content)
-              } catch (error) {
-                if (import.meta.env.DEV) {
-                  console.warn(`Skipped loading content for ${file.path}:`, error)
-                }
-              }
-            }),
-          )
-        }
-
-        // Fetch commits and issues before starting graph construction
-        const [commits, issues] = await Promise.all([
-          fetchCommits(owner, name, controller.signal).catch(() => []),
-          fetchIssues(owner, name, controller.signal).catch(() => []),
-        ])
-
-        // Phase 3: computing-graph
-        actions.setStatus('computing-graph')
-        let graphData
-
-        graphData = await buildGraphInWorker({
-          files,
-          contents,
-          commits,
-          issues,
-        })
-
-        actions.setGraph(graphData)
-        // Phase 4: ready
-        actions.setStatus('ready')
-      } catch (error: unknown) {
-        if (controller.signal.aborted) {
-          return
-        }
-        if (import.meta.env.DEV) {
-          console.error('Failed to build graph:', error)
-        }
-        const message = error instanceof Error ? error.message : String(error)
-        actions.setError(message)
-        actions.setStatus('error')
-        alert(`Failed to build repository universe: ${message}`)
-        actions.setRepo(null)
-      }
-    }
-
-    loadRepository()
-
-    return () => {
-      controller.abort()
-    }
-  }, [repo, actions])
-
+function LoadingScreen() {
   return (
-    <main className="relative min-h-screen overflow-hidden bg-void text-cyan">
-      <canvas
-        ref={canvasRef}
-        className="absolute inset-0 block h-full w-full"
-        aria-hidden="true"
-      />
-      <h1 className="sr-only">ETHER</h1>
-      <HUD />
-    </main>
-  )
+    <div className="flex h-screen w-screen flex-col items-center justify-center bg-void font-mono text-cyan-400">
+      <div className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-400 border-t-transparent mb-4" />
+      <div>LOADING CYBERSPACE...</div>
+    </div>
+  );
 }
 
-export default App
+export default function App() {
+  const isWebGLSupported = useWebGLSupport();
+
+  if (!isWebGLSupported) {
+    return <WebGLFallback />;
+  }
+
+  return (
+    <ErrorBoundary>
+      <div className="relative min-h-screen bg-void text-slate-200 select-none">
+        <Suspense fallback={<LoadingScreen />}>
+          <Routes>
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/analysis/:analysisId" element={<AnalysisPage />} />
+            <Route path="/explore/demo" element={<DemoPage />} />
+            <Route path="/explore/:analysisId" element={<ExplorerPage />} />
+            <Route path="/security" element={<SecurityPage />} />
+            <Route path="/privacy" element={<PrivacyPage />} />
+            <Route path="*" element={<NotFoundPage />} />
+          </Routes>
+        </Suspense>
+      </div>
+    </ErrorBoundary>
+  );
+}

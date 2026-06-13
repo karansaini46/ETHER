@@ -1,9 +1,3 @@
-import type {
-  GithubCommit,
-  GithubFile,
-  GithubIssue,
-} from '@/types/github'
-
 export type NodeType =
   | 'component'
   | 'util'
@@ -12,45 +6,44 @@ export type NodeType =
   | 'config'
   | 'test'
   | 'entry'
-  | 'unknown'
+  | 'unknown';
+
+export type RiskLevel = 'low' | 'medium' | 'high';
 
 export interface GraphNode {
-  id: string
-  label: string
-  type: NodeType
-  size: number
-  commits: number
-  hasIssue: boolean
-  isRecent: boolean
-  language: string
-  position: [number, number, number]
-  centrality: number
-  weight: number
+  id: string;
+  label: string;
+  type: NodeType;
+  folder: string;
+  language: string;
+  size: number;
+  lineCount: number;
+  position: [number, number, number];
+  centrality: number;
+  weight: number;
+  commits: number;
+  lastModified: string | null;
+  isRecent: boolean;
+  hasIssue: boolean;
+  riskLevel: RiskLevel;
+  importCount: number;
+  importedByCount: number;
 }
 
 export interface GraphEdge {
-  source: string
-  target: string
-  weight: number
+  source: string;
+  target: string;
+  weight: number;
 }
 
 export interface GraphData {
-  nodes: GraphNode[]
-  edges: GraphEdge[]
-  positions: Float32Array
-  repoName: string
-  fetchedAt: number
-}
-
-export interface GraphWorkerInput {
-  files: GithubFile[]
-  contents: Map<string, string>
-  commits: GithubCommit[]
-  issues: GithubIssue[]
-}
-
-export type GraphWorkerOutput = GraphData
-
-export interface GraphWorkerApi {
-  buildGraph(input: GraphWorkerInput): GraphWorkerOutput
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+  repoName: string;
+  repoOwner: string;
+  defaultBranch: string;
+  totalFiles: number;
+  analyzedFiles: number;
+  languages: Record<string, number>;
+  fetchedAt: number;
 }

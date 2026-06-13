@@ -1,12 +1,20 @@
-export interface NavCommand {
-  type: 'fly-to' | 'highlight' | 'explain' | 'impact'
-  target?: string // node id
-  message: string // human-readable description of what AI is doing
+export interface NavigatorAction {
+  type: 'focusNodes' | 'highlightEdges' | 'openInspector' | 'isolateCluster' | 'showImpactPath' | 'showSearchResults';
+  nodeIds?: string[];
+  edgeKeys?: string[];
+  message: string;
+}
+
+export interface NavigatorResponse {
+  content: string;
+  actions: NavigatorAction[];
+  referencedFiles: string[];
 }
 
 export interface ChatMessage {
-  role: 'user' | 'assistant'
-  content: string
-  command?: NavCommand // parsed from assistant response if present
-  timestamp: number
+  role: 'user' | 'assistant';
+  content: string;
+  actions?: NavigatorAction[];
+  referencedFiles?: string[];
+  timestamp: number;
 }

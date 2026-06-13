@@ -1,52 +1,72 @@
-import fs from 'fs'
-import path from 'path'
-import cors from 'cors'
-import express from 'express'
+import path from 'node:path';
+import fs from 'node:fs';
+import express from 'express';
+import { config } from './config/env.js';
+import { createHelmetMiddleware, createCorsMiddleware } from './middleware/security.js';
+import { requestIdMiddleware } from './middleware/request-id.js';
+import { generalLimiter } from './middleware/rate-limit.js';
+import { errorHandler } from './middleware/error-handler.js';
+import { githubRouter } from './routes/github.js';
+import { analysisRouter } from './routes/analysis.js';
+import { navigatorRouter } from './routes/navigator.js';
 
-import { githubRouter } from './routes/github.js'
-import { chatRouter } from './routes/chat.js'
+const app = express();
 
-// Manually load env variables from .env file
-try {
-  const envPath = path.resolve(process.cwd(), '.env')
-  if (fs.existsSync(envPath)) {
-    const envContent = fs.readFileSync(envPath, 'utf-8')
-    for (const line of envContent.split('\n')) {
-      const trimmed = line.trim()
-      if (trimmed && !trimmed.startsWith('#')) {
-        const firstEquals = trimmed.indexOf('=')
-        if (firstEquals !== -1) {
-          const key = trimmed.slice(0, firstEquals).trim()
-          const val = trimmed.slice(firstEquals + 1).trim()
-          // Remove potential wrapping quotes
-          const cleanVal = val.replace(/^["']|["']$/g, '')
-          process.env[key] = cleanVal
-        }
-      }
-    }
+// Security middleware
+app.use(createHelmetMiddleware());
+app.use(createCorsMiddleware());
+app.use(requestIdMiddleware);
+app.use(generalLimiter);
+
+// Body parsing with size limits
+app.use(express.json({ limit: '2mb' }));
+
+// Health check (no auth required)
+app.get('/api/health', (_req, res) => {
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    ai: !!config.geminiApiKey,
+    github: !!config.githubToken,
+  });
+});
+
+// API routes
+app.use(githubRouter);
+app.use(analysisRouter);
+app.use(navigatorRouter);
+
+// Production: serve static files and SPA fallback
+if (config.nodeEnv === 'production') {
+  const distPath = path.resolve(process.cwd(), 'dist');
+  if (fs.existsSync(distPath)) {
+    app.use(express.static(distPath, { maxAge: '1y', immutable: true }));
+    app.get('*', (_req, res) => {
+      res.sendFile(path.join(distPath, 'index.html'));
+    });
   }
-} catch {
-  // Quiet fail to conform to console log constraints
 }
 
-const app = express()
-const port = Number(process.env.PORT ?? 3001)
+// Error handler (must be last)
+app.use(errorHandler);
 
-app.use(express.json())
+// Start server
+const server = app.listen(config.port, () => {
+  console.info(`[ether] Server listening on http://localhost:${config.port}`);
+  console.info(`[ether] Environment: ${config.nodeEnv}`);
+  console.info(`[ether] GitHub token: ${config.githubToken ? 'configured' : 'not set'}`);
+  console.info(`[ether] AI Navigator: ${config.geminiApiKey ? 'enabled' : 'disabled'}`);
+});
 
-app.use(
-  cors({
-    origin: 'http://localhost:5173',
-  }),
-)
+// Graceful shutdown
+function shutdown() {
+  console.info('[ether] Shutting down...');
+  server.close(() => {
+    console.info('[ether] Server closed');
+    process.exit(0);
+  });
+  setTimeout(() => process.exit(1), 10_000);
+}
 
-app.get('/api/health', (_request, response) => {
-  response.status(200).json({ status: 'ok' })
-})
-
-app.use(githubRouter)
-app.use(chatRouter)
-
-app.listen(port, () => {
-  console.info(`Server listening on http://localhost:${port}`)
-})
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);
