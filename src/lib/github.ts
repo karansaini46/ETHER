@@ -133,6 +133,7 @@ export async function fetchCommits(
         authorDate:
           author && typeof author.date === 'string' ? author.date : '',
         url: entry.html_url,
+        ...(path === undefined ? {} : { path }),
       },
     ]
   })

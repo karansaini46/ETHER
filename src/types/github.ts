@@ -11,6 +11,7 @@ export interface GithubCommit {
   author: string
   authorDate: string
   url: string
+  path?: string
 }
 
 export interface GithubIssue {
