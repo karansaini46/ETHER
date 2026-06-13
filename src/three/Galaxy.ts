@@ -1,4 +1,5 @@
 import {
+  AdditiveBlending,
   AmbientLight,
   BufferGeometry,
   Color,
@@ -10,10 +11,16 @@ import {
   LineBasicMaterial,
   LineSegments,
   Matrix4,
+  Mesh,
+  MeshBasicMaterial,
   PerspectiveCamera,
+  PlaneGeometry,
   PointLight,
   Scene,
-  type Material,
+  ShaderMaterial,
+  TorusGeometry,
+  Material,
+  Vector2,
   Vector3,
   WebGLRenderer,
 } from 'three'
@@ -21,6 +28,9 @@ import {
   CSS2DObject,
   CSS2DRenderer,
 } from 'three/addons/renderers/CSS2DRenderer.js'
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js'
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 
 import {
   getNodeColor,
@@ -31,6 +41,7 @@ import {
 } from './NodeMesh'
 import { CameraRig } from './CameraRig'
 import { NodeRaycaster } from './Raycaster'
+import { ParticleSystem } from './Particles'
 import { useStore } from '@/store'
 import type { GraphData, GraphNode, NodeType } from '@/types/graph'
 import type { NavCommand } from '@/types/navigator'
@@ -52,13 +63,37 @@ interface LabelRecord {
   element: HTMLDivElement
 }
 
+const BUG_GLOW_VERTEX_SHADER = `
+  varying vec2 vUv;
+  void main() {
+    vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`
+
+const BUG_GLOW_FRAGMENT_SHADER = `
+  uniform float uTime;
+  varying vec2 vUv;
+  void main() {
+    float dist = distance(vUv, vec2(0.5));
+    if (dist > 0.5) discard;
+    
+    float alpha = smoothstep(0.5, 0.0, dist);
+    float pulse = 0.6 + 0.4 * sin(uTime * 6.28);
+    
+    gl_FragColor = vec4(1.0, 0.18, 0.33, alpha * pulse * 0.75);
+  }
+`
+
 export class Galaxy {
   private readonly canvas: HTMLCanvasElement
   private readonly renderer: WebGLRenderer
   private readonly labelRenderer: CSS2DRenderer
+  private readonly composer: EffectComposer
   private readonly camera: PerspectiveCamera
   private readonly cameraRig: CameraRig
   private readonly nodeRaycaster: NodeRaycaster
+  private readonly particles = new ParticleSystem()
   private readonly scene: Scene
   private readonly graphRoot = new Group()
   private readonly resizeObserver: ResizeObserver
@@ -68,6 +103,8 @@ export class Galaxy {
   private readonly nodeMeshes: InstancedMesh[] = []
   private readonly labels: LabelRecord[] = []
   private readonly recentLights: PointLight[] = []
+  private readonly bugGlowMeshes: Mesh[] = []
+  private readonly selectedRing: Mesh
   private readonly cameraWorldPosition = new Vector3()
   private readonly labelWorldPosition = new Vector3()
   private readonly storeUnsubscribers: Array<() => void> = []
@@ -100,6 +137,34 @@ export class Galaxy {
     this.scene.add(new AmbientLight(0xffffff, 1.4))
     this.scene.add(this.graphRoot)
 
+    // Add particle mesh to scene
+    this.scene.add(this.particles.getMesh())
+
+    // Setup Selected Ring Torus
+    const ringGeometry = new TorusGeometry(1, 0.04, 8, 32)
+    const ringMaterial = new MeshBasicMaterial({
+      color: 0x00d4ff,
+      wireframe: true,
+      transparent: true,
+      opacity: 0.8,
+    })
+    this.selectedRing = new Mesh(ringGeometry, ringMaterial)
+    this.selectedRing.visible = false
+    this.scene.add(this.selectedRing)
+
+    // Post processing UnrealBloomPass
+    this.composer = new EffectComposer(this.renderer)
+    const renderPass = new RenderPass(this.scene, this.camera)
+    this.composer.addPass(renderPass)
+
+    const bloomPass = new UnrealBloomPass(
+      new Vector2(canvas.clientWidth, canvas.clientHeight),
+      0.8, // strength
+      0.6, // radius
+      0.3, // threshold
+    )
+    this.composer.addPass(bloomPass)
+
     this.labelRenderer = new CSS2DRenderer()
     this.labelRenderer.domElement.className = 'galaxy-label-layer'
     Object.assign(this.labelRenderer.domElement.style, {
@@ -121,7 +186,6 @@ export class Galaxy {
     this.resizeObserver.observe(this.resizeTarget)
     this.resize()
 
-    // 1. Subscribe to graph changes in Zustand store
     let currentGraph = useStore.getState().graph
     if (currentGraph) {
       this.loadGraph(currentGraph)
@@ -139,13 +203,16 @@ export class Galaxy {
     })
     this.storeUnsubscribers.push(unsubGraph)
 
-    // 2. Subscribe to latest chat history messages to see if there is a command to run
     let lastHandledMessageTimestamp = 0
     const unsubChatHistory = useStore.subscribe((state) => {
       const messages = state.chatHistory
       if (messages.length > 0) {
         const latestMsg = messages[messages.length - 1]
-        if (latestMsg.role === 'assistant' && latestMsg.command && latestMsg.timestamp > lastHandledMessageTimestamp) {
+        if (
+          latestMsg.role === 'assistant' &&
+          latestMsg.command &&
+          latestMsg.timestamp > lastHandledMessageTimestamp
+        ) {
           lastHandledMessageTimestamp = latestMsg.timestamp
           this.executeCommand(latestMsg.command)
         }
@@ -173,6 +240,14 @@ export class Galaxy {
 
       if (node.isRecent) {
         this.createRecentLight(node)
+        // Trigger supernova burst on loading recent node
+        const pos = new Vector3().fromArray(node.position)
+        const col = getNodeColor(node.type, node.hasIssue)
+        this.particles.burst(pos, col, 80)
+      }
+
+      if (node.hasIssue) {
+        this.createBugGlow(node)
       }
     }
 
@@ -204,7 +279,6 @@ export class Galaxy {
     this.disposed = true
     cancelAnimationFrame(this.animationFrameId)
 
-    // Unsubscribe from Zustand store events
     for (const unsubscribe of this.storeUnsubscribers) {
       unsubscribe()
     }
@@ -218,6 +292,7 @@ export class Galaxy {
     this.labelRenderer.domElement.remove()
     releaseNodeMaterials()
     this.renderer.renderLists.dispose()
+    this.composer.dispose()
     this.renderer.dispose()
   }
 
@@ -232,34 +307,33 @@ export class Galaxy {
     }
 
     if (command.type === 'fly-to' && command.target) {
-      const node = graph.nodes.find((candidate) => candidate.id === command.target)
+      const node = graph.nodes.find(
+        (candidate) => candidate.id === command.target,
+      )
       if (node) {
-        // Highlight/select the target node in HUD
         actions.selectNode(node)
 
-        // Compute camera flight destination (slightly offset from node)
         const targetPos = new Vector3().fromArray(node.position)
         const offset = new Vector3(0, 20, 60)
         const cameraTarget = targetPos.clone().add(offset)
 
-        // Initiate flight slerping looking directly at the node
         this.flyTo(cameraTarget, 1500, targetPos)
       }
-    } else if (
-      command.type === 'highlight' &&
-      command.target
-    ) {
-      const node = graph.nodes.find((candidate) => candidate.id === command.target)
+    } else if (command.type === 'highlight' && command.target) {
+      const node = graph.nodes.find(
+        (candidate) => candidate.id === command.target,
+      )
       if (node) {
         actions.highlightNodes(new Set([node.id]))
         actions.selectNode(node)
       }
     } else if (
-      (command.type === 'explain' ||
-        command.type === 'impact') &&
+      (command.type === 'explain' || command.type === 'impact') &&
       command.target
     ) {
-      const node = graph.nodes.find((candidate) => candidate.id === command.target)
+      const node = graph.nodes.find(
+        (candidate) => candidate.id === command.target,
+      )
       if (node) {
         actions.selectNode(node)
       }
@@ -276,6 +350,9 @@ export class Galaxy {
     this.previousFrameTime = time
     this.cameraRig.update(delta)
 
+    // Update particles
+    this.particles.update(delta)
+
     const pulse = 0.12 + (Math.sin(time * 0.004) + 1) * 0.08
     updateNodeMaterialPulse(pulse)
 
@@ -283,11 +360,31 @@ export class Galaxy {
       light.intensity = 0.35 + (Math.sin(time * 0.004) + 1) * 0.12
     }
 
-    // Update highlights in the loop without triggering React renders
-    this.updateHighlightedStars()
+    // Update bug glows to face camera and pulse uTime uniform
+    for (const glow of this.bugGlowMeshes) {
+      glow.quaternion.copy(this.camera.quaternion)
+      if (glow.material instanceof ShaderMaterial) {
+        glow.material.uniforms.uTime.value = time * 0.001
+      }
+    }
 
+    // Rotate and scale selected node torus ring
+    const selectedNode = useStore.getState().selectedNode
+    if (selectedNode) {
+      this.selectedRing.visible = true
+      this.selectedRing.position.fromArray(selectedNode.position)
+      const nodeScale = 0.5 + selectedNode.centrality * 3
+      this.selectedRing.scale.setScalar(nodeScale * 1.4)
+      this.selectedRing.rotation.y += delta * 1.8
+    } else {
+      this.selectedRing.visible = false
+    }
+
+    this.updateHighlightedStars()
     this.updateLabelVisibility()
-    this.renderer.render(this.scene, this.camera)
+
+    // Render using post processing composer instead of renderer
+    this.composer.render()
     this.labelRenderer.render(this.scene, this.camera)
     this.animationFrameId = requestAnimationFrame(this.animate)
   }
@@ -299,7 +396,9 @@ export class Galaxy {
       const nodeIds = mesh.userData.nodeIds as string[]
       if (!nodeIds) continue
 
-      const attribute = mesh.geometry.getAttribute('instanceHighlighted') as InstancedBufferAttribute
+      const attribute = mesh.geometry.getAttribute(
+        'instanceHighlighted',
+      ) as InstancedBufferAttribute
       if (!attribute) continue
 
       let needsUpdate = false
@@ -379,17 +478,36 @@ export class Galaxy {
     const positionsById = new Map(
       data.nodes.map((node) => [node.id, node.position]),
     )
+    const colorsById = new Map(
+      data.nodes.map((node) => [
+        node.id,
+        getNodeColor(node.type, node.hasIssue),
+      ]),
+    )
+
     const edgePositions: number[] = []
+    const edgeColors: number[] = []
 
     for (const edge of data.edges) {
       const sourcePosition = positionsById.get(edge.source)
       const targetPosition = positionsById.get(edge.target)
 
-      if (!sourcePosition || !targetPosition) {
+      const sourceColor = colorsById.get(edge.source)
+      const targetColor = colorsById.get(edge.target)
+
+      if (!sourcePosition || !targetPosition || !sourceColor || !targetColor) {
         continue
       }
 
       edgePositions.push(...sourcePosition, ...targetPosition)
+      edgeColors.push(
+        sourceColor.r,
+        sourceColor.g,
+        sourceColor.b,
+        targetColor.r,
+        targetColor.g,
+        targetColor.b,
+      )
     }
 
     if (edgePositions.length === 0) {
@@ -401,8 +519,10 @@ export class Galaxy {
       'position',
       new Float32BufferAttribute(edgePositions, 3),
     )
+    geometry.setAttribute('color', new Float32BufferAttribute(edgeColors, 3))
+
     const material = new LineBasicMaterial({
-      color: 0x334155,
+      vertexColors: true,
       opacity: 0.35,
       transparent: true,
     })
@@ -446,6 +566,26 @@ export class Galaxy {
     this.graphRoot.add(light)
   }
 
+  private createBugGlow(node: GraphNode): void {
+    const size = (0.5 + node.centrality * 3) * 3.5
+    const geometry = new PlaneGeometry(size, size)
+    const material = new ShaderMaterial({
+      vertexShader: BUG_GLOW_VERTEX_SHADER,
+      fragmentShader: BUG_GLOW_FRAGMENT_SHADER,
+      uniforms: {
+        uTime: { value: 0 },
+      },
+      transparent: true,
+      depthWrite: false,
+      blending: AdditiveBlending,
+    })
+
+    const mesh = new Mesh(geometry, material)
+    mesh.position.fromArray(node.position)
+    this.bugGlowMeshes.push(mesh)
+    this.graphRoot.add(mesh)
+  }
+
   private updateLabelVisibility(): void {
     this.camera.getWorldPosition(this.cameraWorldPosition)
 
@@ -461,6 +601,7 @@ export class Galaxy {
 
   private clearGraph(): void {
     this.graphRoot.clear()
+    this.particles.clear()
 
     for (const geometry of this.graphGeometries) {
       geometry.dispose()
@@ -474,11 +615,19 @@ export class Galaxy {
       element.remove()
     }
 
+    for (const glow of this.bugGlowMeshes) {
+      glow.geometry.dispose()
+      if (glow.material instanceof Material) {
+        glow.material.dispose()
+      }
+    }
+
     this.graphGeometries.clear()
     this.graphMaterials.clear()
     this.nodeMeshes.length = 0
     this.labels.length = 0
     this.recentLights.length = 0
+    this.bugGlowMeshes.length = 0
   }
 
   private resize(): void {
@@ -494,6 +643,7 @@ export class Galaxy {
     this.camera.aspect = width / height
     this.camera.updateProjectionMatrix()
     this.renderer.setSize(width, height, false)
+    this.composer.setSize(width, height)
     this.labelRenderer.setSize(width, height)
   }
 }
