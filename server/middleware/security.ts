@@ -27,8 +27,28 @@ export function createHelmetMiddleware(): RequestHandler {
 }
 
 export function createCorsMiddleware(): RequestHandler {
+  const allowedOrigin = config.corsOrigin.replace(/\/$/, ''); // Remove trailing slash if present
+
   return cors({
-    origin: config.corsOrigin,
+    origin: (origin, callback) => {
+      if (!origin) {
+        callback(null, true);
+        return;
+      }
+      
+      const normalizedOrigin = origin.replace(/\/$/, '');
+      
+      if (normalizedOrigin === allowedOrigin || allowedOrigin === '*' || allowedOrigin === 'all') {
+        callback(null, true);
+      } else if (
+        normalizedOrigin.startsWith('http://localhost:') || 
+        normalizedOrigin.startsWith('http://127.0.0.1:')
+      ) {
+        callback(null, true);
+      } else {
+        callback(null, false);
+      }
+    },
     credentials: true,
     methods: ['GET', 'POST', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-Id'],
