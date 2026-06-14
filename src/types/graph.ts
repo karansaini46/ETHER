@@ -12,9 +12,9 @@ export type RiskLevel = 'low' | 'medium' | 'high';
 
 export interface GraphNode {
   id: string;
-  displayPath: string;
-  fileName: string;
-  constellationPath: string;
+  displayPath?: string;
+  fileName?: string;
+  constellationPath?: string;
   label: string;
   type: NodeType;
   folder: string;

@@ -38,7 +38,7 @@ export function StarField() {
   const nodes = useMemo(() => {
     if (!graph) return [];
     if (activeConstellationPath) {
-      return graph.nodes.filter((n) => n.constellationPath === activeConstellationPath);
+      return graph.nodes.filter((n) => (n.constellationPath || n.folder) === activeConstellationPath);
     }
     return graph.nodes;
   }, [graph, activeConstellationPath]);

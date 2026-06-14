@@ -166,7 +166,7 @@ export function CameraController() {
   // Handle activeConstellationPath changes to zoom/pan to fit the constellation system
   useEffect(() => {
     if (activeConstellationPath && graph) {
-      const clusterNodes = graph.nodes.filter((n) => n.constellationPath === activeConstellationPath);
+      const clusterNodes = graph.nodes.filter((n) => (n.constellationPath || n.folder) === activeConstellationPath);
       if (clusterNodes.length > 0) {
         if (controlsRef.current && !previousCameraState) {
           const currentPos: [number, number, number] = [camera.position.x, camera.position.y, camera.position.z];

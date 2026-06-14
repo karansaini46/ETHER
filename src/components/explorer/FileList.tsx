@@ -14,10 +14,12 @@ export function FileList() {
   // Filter and sort the files within the currently active system/cluster
   const files = useMemo(() => {
     if (!graph || !activeConstellationPath) return [];
-    const list = graph.nodes.filter((n) => n.constellationPath === activeConstellationPath);
+    const list = graph.nodes.filter((n) => (n.constellationPath || n.folder) === activeConstellationPath);
 
     return [...list].sort((a, b) => {
-      return a.fileName.localeCompare(b.fileName);
+      const nameA = a.fileName || a.label;
+      const nameB = b.fileName || b.label;
+      return nameA.localeCompare(nameB);
     });
   }, [graph, activeConstellationPath]);
 
@@ -25,15 +27,17 @@ export function FileList() {
   const fileDisplayData = useMemo(() => {
     const nameCounts = new Map<string, number>();
     for (const f of files) {
-      nameCounts.set(f.fileName, (nameCounts.get(f.fileName) || 0) + 1);
+      const name = f.fileName || f.label;
+      nameCounts.set(name, (nameCounts.get(name) || 0) + 1);
     }
 
     return files.map((f) => {
-      const isDuplicate = (nameCounts.get(f.fileName) || 0) > 1;
+      const name = f.fileName || f.label;
+      const isDuplicate = (nameCounts.get(name) || 0) > 1;
       return {
         node: f,
-        displayName: f.fileName,
-        extraPath: isDuplicate ? f.displayPath : null,
+        displayName: name,
+        extraPath: isDuplicate ? (f.displayPath || f.id) : null,
       };
     });
   }, [files]);
@@ -65,7 +69,7 @@ export function FileList() {
       e.preventDefault();
       const item = fileDisplayData[index];
       if (item) {
-        selectFileByPath(item.node.displayPath, { source: 'sidebar', focusCamera: true });
+        selectFileByPath(item.node.displayPath || item.node.id, { source: 'sidebar', focusCamera: true });
       }
     }
   };
@@ -100,11 +104,11 @@ export function FileList() {
               type="button"
               role="option"
               aria-selected={isSelected}
-              title={item.node.displayPath}
+              title={item.node.displayPath || item.node.id}
               tabIndex={0}
               onKeyDown={(e) => handleKeyDown(e, index)}
               onClick={() => {
-                selectFileByPath(item.node.displayPath, { source: 'sidebar', focusCamera: true });
+                selectFileByPath(item.node.displayPath || item.node.id, { source: 'sidebar', focusCamera: true });
               }}
               className={`w-full flex items-center gap-2 p-1.5 rounded text-left cursor-pointer transition-all outline-none focus:bg-accent-primary/5 focus:text-primary border-0 bg-transparent ${
                 isSelected
