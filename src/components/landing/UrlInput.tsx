@@ -100,7 +100,7 @@ export function UrlInput() {
   const activeRequestRef = useRef<{
     abortController: AbortController | null;
     unsubscribeStream: (() => void) | null;
-    timeoutId: NodeJS.Timeout | null;
+    timeoutId: ReturnType<typeof setTimeout> | null;
     analysisId: string | null;
   } | null>(null);
 
