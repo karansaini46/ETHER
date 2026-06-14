@@ -4,6 +4,9 @@ const mockGraphData = {
   nodes: [
     {
       id: 'demo:src/main.tsx',
+      displayPath: 'src/main.tsx',
+      fileName: 'main.tsx',
+      constellationPath: 'src',
       label: 'main.tsx',
       type: 'entry',
       folder: 'src',
@@ -23,6 +26,9 @@ const mockGraphData = {
     },
     {
       id: 'demo:src/components/Button.tsx',
+      displayPath: 'src/components/Button.tsx',
+      fileName: 'Button.tsx',
+      constellationPath: 'src/components',
       label: 'Button.tsx',
       type: 'component',
       folder: 'src/components',
@@ -42,6 +48,9 @@ const mockGraphData = {
     },
     {
       id: 'demo:src/utils/math.ts',
+      displayPath: 'src/utils/math.ts',
+      fileName: 'math.ts',
+      constellationPath: 'src/utils',
       label: 'math.ts',
       type: 'util',
       folder: 'src/utils',

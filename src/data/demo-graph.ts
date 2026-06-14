@@ -9,11 +9,15 @@ function node(
   opts: Partial<GraphNode> = {},
 ): GraphNode {
   const label = id.split('/').pop()?.replace(/\.[^.]+$/, '') ?? id;
+  const folder = id.includes('/') ? id.slice(0, id.lastIndexOf('/')) : '/';
   return {
     id,
+    displayPath: id,
+    fileName: label,
+    constellationPath: folder,
     label,
     type,
-    folder: id.includes('/') ? id.slice(0, id.lastIndexOf('/')) : '/',
+    folder,
     language: lang,
     size,
     lineCount: Math.round(size / 35),
