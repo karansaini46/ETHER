@@ -15,9 +15,9 @@ const NotFoundPage = lazy(() => import('@/routes/NotFoundPage'));
 
 function LoadingScreen() {
   return (
-    <div className="flex h-screen w-screen flex-col items-center justify-center bg-void font-mono text-cyan-400">
-      <div className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-400 border-t-transparent mb-4" />
-      <div>LOADING CYBERSPACE...</div>
+    <div className="flex h-screen w-screen flex-col items-center justify-center bg-void font-mono text-accent-secondary">
+      <div className="h-8 w-8 animate-spin rounded-full border-2 border-accent-secondary border-t-transparent mb-4" />
+      <div className="tracking-widest">LOADING CYBERSPACE…</div>
     </div>
   );
 }

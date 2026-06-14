@@ -5,7 +5,7 @@ import { GalaxyBackground } from '@/components/landing/GalaxyBackground';
 
 export function LandingPage() {
   return (
-    <div className="relative min-h-screen bg-void text-primary font-interface overflow-y-auto selection:bg-accent-primary/30 select-none tech-grid film-grain flex flex-col">
+    <div className="landing-wrapper text-primary font-interface overflow-x-clip selection:bg-accent-primary/30 select-none tech-grid film-grain flex flex-col">
       {/* 1. Header Navigation */}
       <header className="w-full max-w-7xl mx-auto px-6 py-6 flex items-center justify-between border-b border-primary/5 z-20">
         <div className="flex items-center gap-12">

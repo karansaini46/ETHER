@@ -42,10 +42,11 @@ class ApiClient {
     return this.request('/navigator/status');
   }
 
-  async startAnalysis(url: string): Promise<{ id: string }> {
+  async startAnalysis(url: string, signal?: AbortSignal): Promise<{ id: string }> {
     return this.request('/repositories/analyze', {
       method: 'POST',
       body: JSON.stringify({ url }),
+      signal,
     });
   }
 

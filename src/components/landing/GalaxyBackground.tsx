@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useExplorerStore } from '@/stores/explorer';
 
 interface StarNode {
   id: string;
@@ -17,6 +18,10 @@ export function GalaxyBackground() {
   const [selectedNode, setSelectedNode] = useState<StarNode | null>(null);
   const mouseRef = useRef({ x: 0, y: 0, targetX: 0, targetY: 0 });
   const nodesRef = useRef<StarNode[]>([]);
+
+  const isAnalyzing = useExplorerStore((s) => 
+    s.analysisStage !== 'idle' && s.analysisStage !== 'ready' && s.analysisStage !== 'error'
+  );
 
   // Initialize nodes in 3D space once
   if (nodesRef.current.length === 0) {
@@ -86,6 +91,17 @@ export function GalaxyBackground() {
     canvas.addEventListener('mouseleave', handleMouseLeave);
     window.addEventListener('resize', handleResize);
 
+    // Track tab visibility to pause animation loops completely
+    let isTabVisible = true;
+    const handleVisibilityChange = () => {
+      isTabVisible = !document.hidden;
+      if (isTabVisible) {
+        cancelAnimationFrame(animationFrameId);
+        render();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     // Camera angles
     let angleY = 0.001; // Continuous slow orbital drift
     let angleX = 0.0005;
@@ -99,6 +115,8 @@ export function GalaxyBackground() {
     }> = [];
 
     const render = () => {
+      if (!isTabVisible) return;
+
       ctx.fillStyle = '#090909';
       ctx.fillRect(0, 0, width, height);
 
@@ -122,9 +140,14 @@ export function GalaxyBackground() {
       mouseRef.current.x += (mouseRef.current.targetX - mouseRef.current.x) * 0.05;
       mouseRef.current.y += (mouseRef.current.targetY - mouseRef.current.y) * 0.05;
 
-      // Update angles
-      angleY += 0.0008 + mouseRef.current.x * 0.0001;
-      angleX += 0.0002 + mouseRef.current.y * 0.0001;
+      // Update angles - slow down dramatically if analyzing to save resources
+      if (isAnalyzing) {
+        angleY += 0.0002;
+        angleX += 0.0001;
+      } else {
+        angleY += 0.0008 + mouseRef.current.x * 0.0001;
+        angleX += 0.0002 + mouseRef.current.y * 0.0001;
+      }
 
       const cosY = Math.cos(angleY);
       const sinY = Math.sin(angleY);
@@ -161,29 +184,31 @@ export function GalaxyBackground() {
       // Sort projected points by depth (painters algorithm)
       projected.sort((a, b) => b.z - a.z);
 
-      // Draw dependency links
-      ctx.strokeStyle = 'rgba(236, 233, 225, 0.05)';
-      ctx.lineWidth = 0.5;
-      for (let i = 0; i < projected.length; i++) {
-        const p1 = projected[i];
-        if (p1.node.id.startsWith('bg-')) continue;
+      // Draw dependency links - completely skip this if analyzing for performance
+      if (!isAnalyzing) {
+        ctx.strokeStyle = 'rgba(236, 233, 225, 0.05)';
+        ctx.lineWidth = 0.5;
+        for (let i = 0; i < projected.length; i++) {
+          const p1 = projected[i];
+          if (p1.node.id.startsWith('bg-')) continue;
 
-        // Link with other cluster items
-        for (let j = i + 1; j < projected.length; j++) {
-          const p2 = projected[j];
-          if (p2.node.id.startsWith('bg-')) continue;
+          // Link with other cluster items
+          for (let j = i + 1; j < projected.length; j++) {
+            const p2 = projected[j];
+            if (p2.node.id.startsWith('bg-')) continue;
 
-          // Connect if Euclidean distance in 3D is close
-          const dx = p1.node.x - p2.node.x;
-          const dy = p1.node.y - p2.node.y;
-          const dz = p1.node.z - p2.node.z;
-          const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+            // Connect if Euclidean distance in 3D is close
+            const dx = p1.node.x - p2.node.x;
+            const dy = p1.node.y - p2.node.y;
+            const dz = p1.node.z - p2.node.z;
+            const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
 
-          if (dist < 180) {
-            ctx.beginPath();
-            ctx.moveTo(p1.x, p1.y);
-            ctx.lineTo(p2.x, p2.y);
-            ctx.stroke();
+            if (dist < 180) {
+              ctx.beginPath();
+              ctx.moveTo(p1.x, p1.y);
+              ctx.lineTo(p2.x, p2.y);
+              ctx.stroke();
+            }
           }
         }
       }
@@ -319,19 +344,24 @@ export function GalaxyBackground() {
       canvas.removeEventListener('mouseleave', handleMouseLeave);
       canvas.removeEventListener('click', handleCanvasClick);
       canvas.removeEventListener('mousemove', handleCanvasMouseMove);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('resize', handleResize);
     };
-  }, [hoveredNode, selectedNode]);
+  }, [hoveredNode, selectedNode, isAnalyzing]);
 
   return (
-    <div className="absolute inset-0 w-full h-full overflow-hidden select-none">
-      <canvas ref={canvasRef} className="w-full h-full block cursor-crosshair opacity-80" />
+    <div className="absolute inset-0 w-full h-full overflow-hidden select-none pointer-events-none">
+      <canvas 
+        ref={canvasRef} 
+        aria-hidden="true" 
+        className="absolute inset-0 w-full h-full block cursor-crosshair opacity-80 pointer-events-auto" 
+      />
       
       {/* HUD floating instrumentation markers */}
       <div className="absolute bottom-12 right-12 font-mono text-[9px] text-secondary/40 flex flex-col gap-1 text-right pointer-events-none select-none">
         <div>SYS_ORBIT_CAMERA: ACTIVE</div>
         <div>FIELD_DEPTH: 450px</div>
-        <div>ROTATION_SPEED: Y_DRFT:0.0008 X_DRFT:0.0002</div>
+        <div>ROTATION_SPEED: {isAnalyzing ? 'Y_DRFT:0.0002 X_DRFT:0.0001' : 'Y_DRFT:0.0008 X_DRFT:0.0002'}</div>
         <div>SCANNER_STARS: {nodesRef.current.length}</div>
       </div>
 
@@ -342,4 +372,5 @@ export function GalaxyBackground() {
     </div>
   );
 }
+
 export default GalaxyBackground;

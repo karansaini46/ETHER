@@ -10,6 +10,7 @@
     "build": "npm run typecheck && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
+    "test:e2e": "playwright test",
     "typecheck": "tsc -b && tsc --project server/tsconfig.json"
   },
   "dependencies": {
@@ -39,6 +40,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.49.0",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/node": "^24.12.3",
