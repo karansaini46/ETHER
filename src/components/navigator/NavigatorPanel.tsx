@@ -15,7 +15,6 @@ export function NavigatorPanel() {
   const aiAvailable = useNavigatorStore((s) => s.aiAvailable);
   const setAIAvailable = useNavigatorStore((s) => s.setAIAvailable);
 
-  const graph = useExplorerStore((s) => s.graph);
   const analysisId = useExplorerStore((s) => s.analysisId);
   const selectNode = useExplorerStore((s) => s.selectNode);
   const highlightNodes = useExplorerStore((s) => s.highlightNodes);

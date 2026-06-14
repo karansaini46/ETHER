@@ -7,6 +7,7 @@ import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 
 export function CameraController() {
   const { camera } = useThree();
+  const persCam = camera as any; // Cast to access perspective camera properties
   
   // Store state
   const selectedNode = useExplorerStore((s) => s.selectedNode);
@@ -41,7 +42,6 @@ export function CameraController() {
     
     if (isMobile) {
       if (inspectorOpen && selectedNode) {
-        // Bottom sheet covers bottom 60% of height: shift node up by 25% of height
         pctY = 0.25;
       }
     } else {
@@ -83,8 +83,7 @@ export function CameraController() {
       camera.getWorldDirection(dir);
       if (dir.lengthSq() < 0.1) dir.set(0, 0, -1);
       
-      const basePos = new Vector3()
-        .copy(focusedNode.position)
+      const basePos = new Vector3(...focusedNode.position)
         .addScaledVector(dir, -focusDist);
 
       // Camera local axes
@@ -93,9 +92,11 @@ export function CameraController() {
       const camRight = new Vector3().crossVectors(camForward, worldUp).normalize();
       const camUp = new Vector3().crossVectors(camRight, camForward).normalize();
 
-      const fovRad = (camera.fov * Math.PI) / 180;
+      const fov = persCam.fov || 45;
+      const aspect = persCam.aspect || 1;
+      const fovRad = (fov * Math.PI) / 180;
       const viewportHeight = 2 * Math.tan(fovRad / 2) * focusDist;
-      const viewportWidth = viewportHeight * camera.aspect;
+      const viewportWidth = viewportHeight * aspect;
 
       const { pctX, pctY } = getCenteringOffsets();
       const worldShiftX = pctX * viewportWidth;
@@ -106,8 +107,7 @@ export function CameraController() {
         .addScaledVector(camRight, -worldShiftX)
         .addScaledVector(camUp, -worldShiftY);
 
-      targetLookAt.current = new Vector3()
-        .copy(focusedNode.position)
+      targetLookAt.current = new Vector3(...focusedNode.position)
         .addScaledVector(camRight, -worldShiftX)
         .addScaledVector(camUp, -worldShiftY);
 
@@ -139,8 +139,7 @@ export function CameraController() {
       camera.getWorldDirection(dir);
       if (dir.lengthSq() < 0.1) dir.set(0, 0, -1);
       
-      const basePos = new Vector3()
-        .copy(focusedNode.position)
+      const basePos = new Vector3(...focusedNode.position)
         .addScaledVector(dir, -focusDist);
 
       const camForward = new Vector3().copy(dir).normalize();
@@ -148,9 +147,11 @@ export function CameraController() {
       const camRight = new Vector3().crossVectors(camForward, worldUp).normalize();
       const camUp = new Vector3().crossVectors(camRight, camForward).normalize();
 
-      const fovRad = (camera.fov * Math.PI) / 180;
+      const fov = persCam.fov || 45;
+      const aspect = persCam.aspect || 1;
+      const fovRad = (fov * Math.PI) / 180;
       const viewportHeight = 2 * Math.tan(fovRad / 2) * focusDist;
-      const viewportWidth = viewportHeight * camera.aspect;
+      const viewportWidth = viewportHeight * aspect;
 
       const { pctX, pctY } = getCenteringOffsets();
       const worldShiftX = pctX * viewportWidth;
@@ -161,8 +162,7 @@ export function CameraController() {
         .addScaledVector(camRight, -worldShiftX)
         .addScaledVector(camUp, -worldShiftY);
 
-      targetLookAt.current = new Vector3()
-        .copy(focusedNode.position)
+      targetLookAt.current = new Vector3(...focusedNode.position)
         .addScaledVector(camRight, -worldShiftX)
         .addScaledVector(camUp, -worldShiftY);
 
@@ -221,9 +221,11 @@ export function CameraController() {
         const camRight = new Vector3().crossVectors(camForward, worldUp).normalize();
         const camUp = new Vector3().crossVectors(camRight, camForward).normalize();
 
-        const fovRad = (camera.fov * Math.PI) / 180;
+        const fov = persCam.fov || 45;
+        const aspect = persCam.aspect || 1;
+        const fovRad = (fov * Math.PI) / 180;
         const viewportHeight = 2 * Math.tan(fovRad / 2) * fitDist;
-        const viewportWidth = viewportHeight * camera.aspect;
+        const viewportWidth = viewportHeight * aspect;
 
         const { pctX, pctY } = getCenteringOffsets();
         const worldShiftX = pctX * viewportWidth;

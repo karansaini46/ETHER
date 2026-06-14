@@ -2,7 +2,7 @@ import { useRef, useMemo } from 'react';
 import { InstancedMesh, Object3D, Color } from 'three';
 import { useFrame } from '@react-three/fiber';
 import { useExplorerStore } from '@/stores/explorer';
-import type { NodeType, GraphNode } from '@/types/graph';
+import type { NodeType } from '@/types/graph';
 
 const NODE_COLORS: Record<NodeType, string> = {
   entry: '#ECE9E1',      // Warm off-white
