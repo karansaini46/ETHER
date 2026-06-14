@@ -19,6 +19,7 @@ export function DependencyLines() {
   const selectedNode = useExplorerStore((s) => s.selectedNode);
   const dependencyMode = useExplorerStore((s) => s.dependencyMode);
   const highlightedEdges = useExplorerStore((s) => s.highlightedEdges);
+  const nodeById = useExplorerStore((s) => s.nodeById);
 
   const pointsRef = useRef<any>(null);
 
@@ -100,7 +101,6 @@ export function DependencyLines() {
       return { positions: new Float32Array(0), colors: new Float32Array(0) };
     }
 
-    const nodeMap = new Map(graph.nodes.map((n) => [n.id, n]));
     const posList: number[] = [];
     const colorList: number[] = [];
 
@@ -108,8 +108,8 @@ export function DependencyLines() {
     const colorTarget = new Color();
 
     for (const edge of graph.edges) {
-      const sourceNode = nodeMap.get(edge.source);
-      const targetNode = nodeMap.get(edge.target);
+      const sourceNode = nodeById.get(edge.source);
+      const targetNode = nodeById.get(edge.target);
 
       if (!sourceNode || !targetNode) continue;
 
@@ -124,10 +124,9 @@ export function DependencyLines() {
         highlightedEdges.has(`${edge.target}\0${edge.source}`);
 
       if (isActive || isAIHighlighted) {
-        opacityFactor = 0.75;
+        opacityFactor = 0.90; // High selected edge opacity
       } else if (selectedNode) {
-        // Dim unrelated lines significantly
-        opacityFactor = 0.01;
+        opacityFactor = 0.06; // Dim unrelated edges but keep them faintly visible
       }
 
       posList.push(sx, sy, sz, tx, ty, tz);
@@ -137,14 +136,12 @@ export function DependencyLines() {
       let c2 = NODE_COLORS[targetNode.type] || '#64748b';
 
       if (selectedNode && isActive) {
-        // Outgoing: Muted Amber
         const isOutgoing =
           edge.source === selectedNode.id ||
           (dependencyMode === 'impact' &&
             outgoingTransitive.has(edge.source) &&
             outgoingTransitive.has(edge.target));
             
-        // Incoming: Neutral Warm-White
         const isIncoming =
           edge.target === selectedNode.id ||
           (dependencyMode === 'impact' &&
@@ -152,10 +149,10 @@ export function DependencyLines() {
             incomingTransitive.has(edge.target));
 
         if (isOutgoing) {
-          c1 = '#E3C78A';
+          c1 = '#E3C78A'; // Muted Amber
           c2 = '#E3C78A';
         } else if (isIncoming) {
-          c1 = '#ECE9E1';
+          c1 = '#ECE9E1'; // Warm Off-White
           c2 = '#ECE9E1';
         }
       }
@@ -171,7 +168,7 @@ export function DependencyLines() {
       positions: new Float32Array(posList),
       colors: new Float32Array(colorList),
     };
-  }, [graph, selectedNode, dependencyMode, activeEdgesSet, highlightedEdges, outgoingTransitive, incomingTransitive]);
+  }, [graph, selectedNode, dependencyMode, activeEdgesSet, highlightedEdges, outgoingTransitive, incomingTransitive, nodeById]);
 
   // Buffer geometry construction
   const geometry = useMemo(() => {
@@ -190,22 +187,18 @@ export function DependencyLines() {
     const posAttr = geom.getAttribute('position');
     if (!posAttr) return;
 
-    // Smooth movement over time
     const t = (state.clock.getElapsedTime() * 0.45) % 1.0;
-
-    const nodeMap = new Map(graph.nodes.map((n) => [n.id, n]));
     let idx = 0;
 
     for (const edgeKey of activeEdgesSet) {
       const [srcId, tgtId] = edgeKey.split('\0');
-      const srcNode = nodeMap.get(srcId);
-      const tgtNode = nodeMap.get(tgtId);
+      const srcNode = nodeById.get(srcId);
+      const tgtNode = nodeById.get(tgtId);
 
       if (srcNode && tgtNode) {
         const [sx, sy, sz] = srcNode.position;
         const [tx, ty, tz] = tgtNode.position;
 
-        // Lerp coordinates along the line from source to target
         const px = sx + (tx - sx) * t;
         const py = sy + (ty - sy) * t;
         const pz = sz + (tz - sz) * t;
@@ -239,7 +232,7 @@ export function DependencyLines() {
             />
           </bufferGeometry>
           <pointsMaterial
-            color="#C56A3A" // Warm orange accent for particles
+            color="#C56A3A"
             size={1.1}
             sizeAttenuation={true}
             transparent

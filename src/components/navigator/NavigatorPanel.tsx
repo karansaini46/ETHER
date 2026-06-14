@@ -21,6 +21,7 @@ export function NavigatorPanel() {
   const highlightNodes = useExplorerStore((s) => s.highlightNodes);
   const highlightEdges = useExplorerStore((s) => s.highlightEdges);
   const isolateCluster = useExplorerStore((s) => s.isolateCluster);
+  const nodeById = useExplorerStore((s) => s.nodeById);
 
   const [input, setInput] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -47,7 +48,7 @@ export function NavigatorPanel() {
 
   // Execute AI action targets inside 3D space
   const executeAction = (action: NavigatorAction) => {
-    const nodeMap = new Map(graph?.nodes.map((n) => [n.id, n]) ?? []);
+    const nodeMap = nodeById;
 
     switch (action.type) {
       case 'focusNodes':

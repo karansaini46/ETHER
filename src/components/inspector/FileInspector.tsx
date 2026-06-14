@@ -35,27 +35,28 @@ export function FileInspector() {
   const openChat = useNavigatorStore((s) => s.openChat);
   const addMessage = useNavigatorStore((s) => s.addMessage);
 
+  const nodeById = useExplorerStore((s) => s.nodeById);
+
   // Compute imports & imported by lists
   const dependencies = useMemo(() => {
     if (!graph || !selectedNode) return { imports: [], importedBy: [] };
 
     const imports: GraphNode[] = [];
     const importedBy: GraphNode[] = [];
-    const nodeMap = new Map(graph.nodes.map((n) => [n.id, n]));
 
     for (const edge of graph.edges) {
       if (edge.source === selectedNode.id) {
-        const target = nodeMap.get(edge.target);
+        const target = nodeById.get(edge.target);
         if (target) imports.push(target);
       }
       if (edge.target === selectedNode.id) {
-        const source = nodeMap.get(edge.source);
+        const source = nodeById.get(edge.source);
         if (source) importedBy.push(source);
       }
     }
 
     return { imports, importedBy };
-  }, [graph, selectedNode]);
+  }, [graph, selectedNode, nodeById]);
 
   if (!selectedNode || !inspectorOpen) return null;
 

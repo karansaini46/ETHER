@@ -23,6 +23,8 @@ export function ExplorerHUD() {
   const clustersOpen = useExplorerStore((s) => s.clustersOpen);
   const setClustersOpen = useExplorerStore((s) => s.setClustersOpen);
   const setSearchOpen = useExplorerStore((s) => s.setSearchOpen);
+  const notification = useExplorerStore((s) => s.notification);
+  const setNotification = useExplorerStore((s) => s.setNotification);
 
   const [isMobile, setIsMobile] = useState(false);
   const [isTablet, setIsTablet] = useState(false);
@@ -206,6 +208,20 @@ export function ExplorerHUD() {
 
       {/* Floating search palette */}
       <SearchCommand />
+
+      {/* Warning toast notification */}
+      {notification && (
+        <div className="fixed bottom-24 right-6 pointer-events-auto bg-danger/90 border border-danger text-primary text-[10px] font-mono p-3 rounded shadow-technical z-toasts animate-slide-up flex items-center gap-2">
+          <span>⚠️</span>
+          <span>{notification}</span>
+          <button 
+            onClick={() => setNotification(null)}
+            className="text-primary/60 hover:text-primary pl-2 border-l border-primary/20"
+          >
+            DISMISS
+          </button>
+        </div>
+      )}
     </div>
   );
 }

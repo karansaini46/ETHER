@@ -18,6 +18,9 @@ export function CameraController() {
   const setSearchOpen = useExplorerStore((s) => s.setSearchOpen);
   const isolatedCluster = useExplorerStore((s) => s.isolatedCluster);
   const graph = useExplorerStore((s) => s.graph);
+  
+  const inspectorOpen = useExplorerStore((s) => s.inspectorOpen);
+  const clustersOpen = useExplorerStore((s) => s.clustersOpen);
 
   const controlsRef = useRef<any>(null);
   const isDragging = useRef(false);
@@ -26,6 +29,31 @@ export function CameraController() {
   const targetPos = useRef<Vector3 | null>(null);
   const targetLookAt = useRef<Vector3 | null>(null);
   const isTransitioning = useRef(false);
+
+  // Helper to calculate HUD centering offset percentages in screen space
+  const getCenteringOffsets = () => {
+    const isMobile = typeof window !== 'undefined' ? window.innerWidth < 768 : false;
+    const leftOpen = !isMobile && clustersOpen;
+    const rightOpen = !isMobile && inspectorOpen && selectedNode;
+    
+    let pctX = 0;
+    let pctY = 0;
+    
+    if (isMobile) {
+      if (inspectorOpen && selectedNode) {
+        // Bottom sheet covers bottom 60% of height: shift node up by 25% of height
+        pctY = 0.25;
+      }
+    } else {
+      const leftWidth = leftOpen ? 256 : 0;
+      const rightWidth = rightOpen ? 320 : 0;
+      const visualCenter = leftWidth + (window.innerWidth - leftWidth - rightWidth) / 2;
+      const screenCenter = window.innerWidth / 2;
+      pctX = (visualCenter - screenCenter) / window.innerWidth;
+    }
+    
+    return { pctX, pctY };
+  };
 
   // Handle focusedNode changes for camera flight
   useEffect(() => {
@@ -41,16 +69,51 @@ export function CameraController() {
         setPreviousCameraState({ position: currentPos, target: currentTgt });
       }
 
-      const [x, y, z] = focusedNode.position;
-      const size = 0.6 + focusedNode.centrality * 2.5 + Math.min(focusedNode.lineCount / 1000, 1.5);
-      const focusDist = size * 5 + 10; // Comfortable distance based on node size
+      // Logarithmic scale size calculation matching StarField
+      const baseScaleLog = 0.6;
+      const metric = focusedNode.lineCount || 0;
+      const scaleFactor = 0.4;
+      let visualScale = baseScaleLog + Math.log1p(metric) * scaleFactor + focusedNode.centrality * 1.5;
+      visualScale = Math.max(0.5, Math.min(3.5, visualScale));
 
-      // Stop comfortable viewing distance offset from node position
-      targetPos.current = new Vector3(x, y + focusDist * 0.3, z + focusDist);
-      targetLookAt.current = new Vector3(x, y, z);
+      const focusDist = visualScale * 6 + 12;
+
+      // Position back along current camera facing direction
+      const dir = new Vector3();
+      camera.getWorldDirection(dir);
+      if (dir.lengthSq() < 0.1) dir.set(0, 0, -1);
+      
+      const basePos = new Vector3()
+        .copy(focusedNode.position)
+        .addScaledVector(dir, -focusDist);
+
+      // Camera local axes
+      const camForward = new Vector3().copy(dir).normalize();
+      const worldUp = new Vector3(0, 1, 0);
+      const camRight = new Vector3().crossVectors(camForward, worldUp).normalize();
+      const camUp = new Vector3().crossVectors(camRight, camForward).normalize();
+
+      const fovRad = (camera.fov * Math.PI) / 180;
+      const viewportHeight = 2 * Math.tan(fovRad / 2) * focusDist;
+      const viewportWidth = viewportHeight * camera.aspect;
+
+      const { pctX, pctY } = getCenteringOffsets();
+      const worldShiftX = pctX * viewportWidth;
+      const worldShiftY = pctY * viewportHeight;
+
+      targetPos.current = new Vector3()
+        .copy(basePos)
+        .addScaledVector(camRight, -worldShiftX)
+        .addScaledVector(camUp, -worldShiftY);
+
+      targetLookAt.current = new Vector3()
+        .copy(focusedNode.position)
+        .addScaledVector(camRight, -worldShiftX)
+        .addScaledVector(camUp, -worldShiftY);
+
       isTransitioning.current = true;
     } else if (!isolatedCluster) {
-      // If focusedNode is cleared, smoothly return back to previous state if it exists
+      // Return smoothly to previous state if cleared
       if (previousCameraState) {
         const [px, py, pz] = previousCameraState.position;
         const [tx, ty, tz] = previousCameraState.target;
@@ -61,12 +124,57 @@ export function CameraController() {
     }
   }, [focusedNode]);
 
+  // Handle panel updates to recalculate offsets dynamically
+  useEffect(() => {
+    if (focusedNode) {
+      const baseScaleLog = 0.6;
+      const metric = focusedNode.lineCount || 0;
+      const scaleFactor = 0.4;
+      let visualScale = baseScaleLog + Math.log1p(metric) * scaleFactor + focusedNode.centrality * 1.5;
+      visualScale = Math.max(0.5, Math.min(3.5, visualScale));
+
+      const focusDist = visualScale * 6 + 12;
+
+      const dir = new Vector3();
+      camera.getWorldDirection(dir);
+      if (dir.lengthSq() < 0.1) dir.set(0, 0, -1);
+      
+      const basePos = new Vector3()
+        .copy(focusedNode.position)
+        .addScaledVector(dir, -focusDist);
+
+      const camForward = new Vector3().copy(dir).normalize();
+      const worldUp = new Vector3(0, 1, 0);
+      const camRight = new Vector3().crossVectors(camForward, worldUp).normalize();
+      const camUp = new Vector3().crossVectors(camRight, camForward).normalize();
+
+      const fovRad = (camera.fov * Math.PI) / 180;
+      const viewportHeight = 2 * Math.tan(fovRad / 2) * focusDist;
+      const viewportWidth = viewportHeight * camera.aspect;
+
+      const { pctX, pctY } = getCenteringOffsets();
+      const worldShiftX = pctX * viewportWidth;
+      const worldShiftY = pctY * viewportHeight;
+
+      targetPos.current = new Vector3()
+        .copy(basePos)
+        .addScaledVector(camRight, -worldShiftX)
+        .addScaledVector(camUp, -worldShiftY);
+
+      targetLookAt.current = new Vector3()
+        .copy(focusedNode.position)
+        .addScaledVector(camRight, -worldShiftX)
+        .addScaledVector(camUp, -worldShiftY);
+
+      isTransitioning.current = true;
+    }
+  }, [clustersOpen, inspectorOpen, selectedNode]);
+
   // Handle isolatedCluster changes to zoom/pan to fit the constellation system
   useEffect(() => {
     if (isolatedCluster && graph) {
       const clusterNodes = graph.nodes.filter((n) => n.folder === isolatedCluster);
       if (clusterNodes.length > 0) {
-        // Save current state before transitioning
         if (controlsRef.current && !previousCameraState) {
           const currentPos: [number, number, number] = [camera.position.x, camera.position.y, camera.position.z];
           const currentTgt: [number, number, number] = [
@@ -100,15 +208,39 @@ export function CameraController() {
         const dz = maxZ - minZ;
         const maxSpan = Math.max(dx, dy, dz, 15);
 
-        // Frame all nodes nicely based on size of cluster
         const fitDist = maxSpan * 1.35 + 16;
 
-        targetPos.current = new Vector3(cx, cy + fitDist * 0.35, cz + fitDist);
-        targetLookAt.current = new Vector3(cx, cy, cz);
+        const dir = new Vector3();
+        camera.getWorldDirection(dir);
+        if (dir.lengthSq() < 0.1) dir.set(0, 0, -1);
+        
+        const basePos = new Vector3(cx, cy, cz).addScaledVector(dir, -fitDist);
+
+        const camForward = new Vector3().copy(dir).normalize();
+        const worldUp = new Vector3(0, 1, 0);
+        const camRight = new Vector3().crossVectors(camForward, worldUp).normalize();
+        const camUp = new Vector3().crossVectors(camRight, camForward).normalize();
+
+        const fovRad = (camera.fov * Math.PI) / 180;
+        const viewportHeight = 2 * Math.tan(fovRad / 2) * fitDist;
+        const viewportWidth = viewportHeight * camera.aspect;
+
+        const { pctX, pctY } = getCenteringOffsets();
+        const worldShiftX = pctX * viewportWidth;
+        const worldShiftY = pctY * viewportHeight;
+
+        targetPos.current = new Vector3()
+          .copy(basePos)
+          .addScaledVector(camRight, -worldShiftX)
+          .addScaledVector(camUp, -worldShiftY);
+
+        targetLookAt.current = new Vector3(cx, cy, cz)
+          .addScaledVector(camRight, -worldShiftX)
+          .addScaledVector(camUp, -worldShiftY);
+
         isTransitioning.current = true;
       }
     } else if (!isolatedCluster && !focusedNode) {
-      // Return to home state when isolatedCluster is cleared
       if (previousCameraState) {
         const [px, py, pz] = previousCameraState.position;
         const [tx, ty, tz] = previousCameraState.target;
@@ -165,10 +297,10 @@ export function CameraController() {
     if (!controls) return;
 
     // Check prefers-reduced-motion
-    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const prefersReducedMotion = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const lerpFactor = prefersReducedMotion ? 0.95 : 0.08;
 
-    // Transition camera if actively focused or returning
+    // Transition camera if active
     if (isTransitioning.current && targetPos.current && targetLookAt.current) {
       if (isDragging.current) {
         // Halt automatic movement if user manually overrides by dragging
@@ -189,7 +321,6 @@ export function CameraController() {
         }
       }
     } else {
-      // Standard controls damping update
       controls.update();
     }
   });

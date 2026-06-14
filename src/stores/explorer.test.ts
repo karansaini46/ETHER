@@ -49,9 +49,10 @@ describe('explorer Zustand store', () => {
       inspectorOpen: false,
       renderingOpen: false,
       clustersOpen: true,
-      nodeMap: new Map(),
-      nodeIdByPath: new Map(),
-      clusterNodeIdsByPath: new Map(),
+      nodeById: new Map(),
+      nodeIdByFullPath: new Map(),
+      nodeIdsByConstellationPath: new Map(),
+      notification: null,
     });
   });
 
@@ -66,9 +67,10 @@ describe('explorer Zustand store', () => {
   it('should update selectedNode and clear highlighted structures', () => {
     useExplorerStore.getState().setGraph(mockGraphData);
 
-    useExplorerStore.getState().selectNode(mockNode);
-    expect(useExplorerStore.getState().selectedNode).toEqual(mockNode);
-    expect(useExplorerStore.getState().selectedNodeId).toBe(mockNode.id);
+    const nodeInGraph = useExplorerStore.getState().graph?.nodes[0]!;
+    useExplorerStore.getState().selectNode(nodeInGraph);
+    expect(useExplorerStore.getState().selectedNode).toEqual(nodeInGraph);
+    expect(useExplorerStore.getState().selectedNodeId).toBe(nodeInGraph.id);
     expect(useExplorerStore.getState().inspectorOpen).toBe(true);
 
     // Deselect
@@ -88,7 +90,7 @@ describe('explorer Zustand store', () => {
 
     // Select using path with backslashes
     useExplorerStore.getState().selectNode('src\\components\\Button.tsx');
-    expect(useExplorerStore.getState().selectedNodeId).toBe('src/components/Button.tsx');
+    expect(useExplorerStore.getState().selectedNodeId).toBe('demo:src/components/Button.tsx');
   });
 
   it('should set searchOpen state toggle', () => {

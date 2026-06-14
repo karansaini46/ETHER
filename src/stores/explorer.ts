@@ -6,15 +6,27 @@ export interface SelectNodeOptions {
   source?: 'canvas' | 'sidebar' | 'search' | 'navigator' | 'dependency-list';
   focusCamera?: boolean;
   openInspector?: boolean;
+  revealNode?: boolean;
   highlightDependencies?: boolean;
 }
 
 export const normalizePath = (p: string): string => {
-  return p
+  let normalized = p
     .replace(/\\/g, '/')
     .replace(/^\.\//, '')
-    .replace(/\/+/g, '/')
-    .trim();
+    .replace(/\/+/g, '/');
+  
+  if (normalized.endsWith('/') && normalized.length > 1) {
+    normalized = normalized.slice(0, -1);
+  }
+  
+  try {
+    normalized = decodeURIComponent(normalized);
+  } catch (e) {
+    // ignore decoding errors
+  }
+  
+  return normalized.trim();
 };
 
 interface ExplorerState {
@@ -35,9 +47,9 @@ interface ExplorerState {
   isDemo: boolean;
 
   // Lookup Maps
-  nodeMap: Map<string, GraphNode>;
-  nodeIdByPath: Map<string, string>;
-  clusterNodeIdsByPath: Map<string, string[]>;
+  nodeById: Map<string, GraphNode>;
+  nodeIdByFullPath: Map<string, string>;
+  nodeIdsByConstellationPath: Map<string, string[]>;
 
   // Selection
   selectedNode: GraphNode | null;
@@ -59,6 +71,9 @@ interface ExplorerState {
   searchQuery: string;
   searchOpen: boolean;
 
+  // Non-blocking notification
+  notification: string | null;
+
   // Actions
   setRepoUrl: (url: string | null) => void;
   setRepoInfo: (owner: string, name: string) => void;
@@ -66,6 +81,7 @@ interface ExplorerState {
   setAnalysisStatus: (stage: AnalysisStage | 'idle', progress: number, message: string, error?: string) => void;
   setGraph: (graph: GraphData | null, isDemo?: boolean) => void;
   selectNode: (nodeIdOrNode: string | GraphNode | null, options?: SelectNodeOptions) => void;
+  selectFileByPath: (fullPath: string, options?: SelectNodeOptions) => void;
   setHoveredNode: (node: GraphNode | null) => void;
   setFocusedNode: (node: GraphNode | null) => void;
   setDependencyMode: (mode: 'all' | 'incoming' | 'outgoing' | 'impact') => void;
@@ -79,6 +95,7 @@ interface ExplorerState {
   setClustersOpen: (open: boolean) => void;
   setSearchQuery: (query: string) => void;
   setSearchOpen: (open: boolean) => void;
+  setNotification: (msg: string | null) => void;
   reset: () => void;
 }
 
@@ -93,9 +110,9 @@ const initialState = {
   analysisError: null,
   graph: null,
   isDemo: false,
-  nodeMap: new Map<string, GraphNode>(),
-  nodeIdByPath: new Map<string, string>(),
-  clusterNodeIdsByPath: new Map<string, string[]>(),
+  nodeById: new Map<string, GraphNode>(),
+  nodeIdByFullPath: new Map<string, string>(),
+  nodeIdsByConstellationPath: new Map<string, string[]>(),
   selectedNode: null,
   selectedNodeId: null,
   hoveredNode: null,
@@ -110,9 +127,10 @@ const initialState = {
   clustersOpen: true,
   searchQuery: '',
   searchOpen: false,
+  notification: null,
 };
 
-export const useExplorerStore = create<ExplorerState>()((set) => ({
+export const useExplorerStore = create<ExplorerState>()((set, get) => ({
   ...initialState,
 
   setRepoUrl: (url) => set({ repoUrl: url }),
@@ -121,40 +139,72 @@ export const useExplorerStore = create<ExplorerState>()((set) => ({
   setAnalysisStatus: (stage, progress, message, error) =>
     set({ analysisStage: stage, analysisProgress: progress, analysisMessage: message, analysisError: error ?? null }),
   
-  setGraph: (graph, isDemo = false) => set(() => {
+  setGraph: (graph, isDemo = false) => set((state) => {
     if (!graph) {
       return { 
         graph, 
         isDemo, 
-        nodeMap: new Map(), 
-        nodeIdByPath: new Map(), 
-        clusterNodeIdsByPath: new Map() 
+        nodeById: new Map(), 
+        nodeIdByFullPath: new Map(), 
+        nodeIdsByConstellationPath: new Map() 
       };
     }
 
-    const nodeMap = new Map<string, GraphNode>();
-    const nodeIdByPath = new Map<string, string>();
-    const clusterNodeIdsByPath = new Map<string, string[]>();
+    const currentAnalysisId = state.analysisId || 'demo';
 
-    for (const node of graph.nodes) {
+    // Map raw nodes to stable IDs
+    const mappedNodes = graph.nodes.map((node) => {
       const normPath = normalizePath(node.id);
-      nodeMap.set(node.id, node);
-      nodeIdByPath.set(normPath, node.id);
+      const stableId = `${currentAnalysisId}:${normPath}`;
+      const normFolder = normalizePath(node.folder || '/');
+      return {
+        ...node,
+        id: stableId,
+        folder: normFolder,
+      };
+    });
 
-      const folder = node.folder || '/';
-      const normFolder = normalizePath(folder);
-      if (!clusterNodeIdsByPath.has(normFolder)) {
-        clusterNodeIdsByPath.set(normFolder, []);
+    // Map edges to match stable source and target IDs
+    const mappedEdges = graph.edges.map((edge) => {
+      const normSource = normalizePath(edge.source);
+      const normTarget = normalizePath(edge.target);
+      return {
+        ...edge,
+        source: `${currentAnalysisId}:${normSource}`,
+        target: `${currentAnalysisId}:${normTarget}`,
+      };
+    });
+
+    const mappedGraph = {
+      ...graph,
+      nodes: mappedNodes,
+      edges: mappedEdges,
+    };
+
+    const nodeById = new Map<string, GraphNode>();
+    const nodeIdByFullPath = new Map<string, string>();
+    const nodeIdsByConstellationPath = new Map<string, string[]>();
+
+    for (const node of mappedNodes) {
+      // Find original normalized path (everything after first colon)
+      const normPath = normalizePath(node.id.substring(currentAnalysisId.length + 1));
+      
+      nodeById.set(node.id, node);
+      nodeIdByFullPath.set(normPath, node.id);
+
+      const normFolder = node.folder;
+      if (!nodeIdsByConstellationPath.has(normFolder)) {
+        nodeIdsByConstellationPath.set(normFolder, []);
       }
-      clusterNodeIdsByPath.get(normFolder)!.push(node.id);
+      nodeIdsByConstellationPath.get(normFolder)!.push(node.id);
     }
 
     return {
-      graph,
+      graph: mappedGraph,
       isDemo,
-      nodeMap,
-      nodeIdByPath,
-      clusterNodeIdsByPath
+      nodeById,
+      nodeIdByFullPath,
+      nodeIdsByConstellationPath
     };
   }),
 
@@ -163,6 +213,7 @@ export const useExplorerStore = create<ExplorerState>()((set) => ({
       return {
         selectedNode: null,
         selectedNodeId: null,
+        focusedNode: null,
         highlightedNodes: new Set(),
         highlightedEdges: new Set(),
       };
@@ -171,13 +222,12 @@ export const useExplorerStore = create<ExplorerState>()((set) => ({
     let resolvedNode: GraphNode | null = null;
     if (typeof nodeIdOrNode === 'string') {
       const norm = normalizePath(nodeIdOrNode);
-      const exactId = state.nodeIdByPath.get(norm);
+      const exactId = state.nodeIdByFullPath.get(norm);
       if (exactId) {
-        resolvedNode = state.nodeMap.get(exactId) || null;
+        resolvedNode = state.nodeById.get(exactId) || null;
       }
-      // Fallback searches
       if (!resolvedNode) {
-        resolvedNode = state.nodeMap.get(nodeIdOrNode) || null;
+        resolvedNode = state.nodeById.get(nodeIdOrNode) || null;
       }
       if (!resolvedNode && state.graph) {
         resolvedNode = state.graph.nodes.find(n => normalizePath(n.id) === norm || n.label === nodeIdOrNode) || null;
@@ -194,12 +244,17 @@ export const useExplorerStore = create<ExplorerState>()((set) => ({
     const w = typeof window !== 'undefined' ? window.innerWidth : 1200;
     const focusCamera = options?.focusCamera ?? false;
     const openInspector = options?.openInspector ?? true;
+    const revealNode = options?.revealNode ?? false;
     const highlightDependencies = options?.highlightDependencies ?? true;
 
     const updates: Partial<ExplorerState> = {
       selectedNode: resolvedNode,
       selectedNodeId: resolvedNode.id,
     };
+
+    if (revealNode && state.isolatedCluster && state.isolatedCluster !== resolvedNode.folder) {
+      updates.isolatedCluster = null; // reset constellation filter
+    }
 
     if (openInspector) {
       updates.inspectorOpen = true;
@@ -234,6 +289,27 @@ export const useExplorerStore = create<ExplorerState>()((set) => ({
 
     return updates;
   }),
+
+  selectFileByPath: (fullPath, options) => {
+    const norm = normalizePath(fullPath);
+    const nodeId = get().nodeIdByFullPath.get(norm);
+    if (nodeId) {
+      get().selectNode(nodeId, {
+        revealNode: true,
+        highlightDependencies: true,
+        openInspector: true,
+        ...options,
+      });
+    } else {
+      console.warn(`[DEV WARNING] File path not found in graph: ${norm}`);
+      get().setNotification("This file is not available in the current graph.");
+      setTimeout(() => {
+        if (get().notification === "This file is not available in the current graph.") {
+          get().setNotification(null);
+        }
+      }, 4000);
+    }
+  },
 
   setHoveredNode: (node) => set({ hoveredNode: node }),
   setFocusedNode: (node) => set({ focusedNode: node }),
@@ -288,6 +364,7 @@ export const useExplorerStore = create<ExplorerState>()((set) => ({
 
   setSearchQuery: (query) => set({ searchQuery: query }),
   setSearchOpen: (open) => set({ searchOpen: open }),
+  setNotification: (msg) => set({ notification: msg }),
   
   reset: () => set(initialState),
 }));

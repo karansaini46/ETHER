@@ -5,11 +5,11 @@ import { FileCode, Terminal } from 'lucide-react';
 export function FileList() {
   const graph = useExplorerStore((s) => s.graph);
   const selectedNode = useExplorerStore((s) => s.selectedNode);
-  const selectNode = useExplorerStore((s) => s.selectNode);
+  const selectFileByPath = useExplorerStore((s) => s.selectFileByPath);
   const isolatedCluster = useExplorerStore((s) => s.isolatedCluster);
 
   const listRef = useRef<HTMLDivElement>(null);
-  const itemRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const itemRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
 
   // Filter and sort the files within the currently active system/cluster
   const files = useMemo(() => {
@@ -53,7 +53,7 @@ export function FileList() {
       e.preventDefault();
       const node = files[index];
       if (node) {
-        selectNode(node, { source: 'sidebar', focusCamera: true });
+        selectFileByPath(node.id, { source: 'sidebar', focusCamera: true });
       }
     }
   };
@@ -76,7 +76,7 @@ export function FileList() {
         {files.map((node, index) => {
           const isSelected = selectedNode?.id === node.id;
           return (
-            <div
+            <button
               key={node.id}
               ref={(el) => {
                 if (el) {
@@ -85,17 +85,18 @@ export function FileList() {
                   itemRefs.current.delete(node.id);
                 }
               }}
+              type="button"
               role="option"
               aria-selected={isSelected}
               title={node.id}
               tabIndex={0}
               onKeyDown={(e) => handleKeyDown(e, index)}
               onClick={() => {
-                selectNode(node, { source: 'sidebar', focusCamera: true });
+                selectFileByPath(node.id, { source: 'sidebar', focusCamera: true });
               }}
-              className={`w-full flex items-center gap-2 p-1.5 rounded text-left cursor-pointer transition-all outline-none focus:bg-accent-primary/5 focus:text-primary ${
+              className={`w-full flex items-center gap-2 p-1.5 rounded text-left cursor-pointer transition-all outline-none focus:bg-accent-primary/5 focus:text-primary border-0 bg-transparent ${
                 isSelected
-                  ? 'bg-accent-primary/10 text-primary border-l-2 border-accent-primary pl-1 font-semibold'
+                  ? 'bg-accent-primary/10 text-primary border-l-2 border-accent-primary pl-1 font-semibold rounded-l-none'
                   : 'text-secondary/70 hover:bg-surface-secondary hover:text-secondary'
               }`}
             >
@@ -104,7 +105,7 @@ export function FileList() {
                 className={isSelected ? 'text-accent-primary shrink-0' : 'text-secondary/30 shrink-0'}
               />
               <span className="truncate text-[9.5px] font-mono">{node.label}</span>
-            </div>
+            </button>
           );
         })}
       </div>

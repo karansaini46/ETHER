@@ -4,7 +4,7 @@ import { CanvasTexture, Vector3 } from 'three';
 import { useExplorerStore } from '@/stores/explorer';
 import type { GraphNode } from '@/types/graph';
 
-// Generate canvas-based textures dynamically to avoid rendering DOM elements for thousands of stars
+// Canvas-based textures for upright camera-facing terminal glyphs ">_"
 const createTerminalIconTexture = (colorStr: string): CanvasTexture => {
   const canvas = document.createElement('canvas');
   canvas.width = 64;
@@ -12,7 +12,6 @@ const createTerminalIconTexture = (colorStr: string): CanvasTexture => {
   const ctx = canvas.getContext('2d');
   if (ctx) {
     ctx.clearRect(0, 0, 64, 64);
-    // Draw monospace terminal glyph ">_"
     ctx.font = 'bold 36px monospace';
     ctx.fillStyle = colorStr;
     ctx.textAlign = 'center';
@@ -23,9 +22,9 @@ const createTerminalIconTexture = (colorStr: string): CanvasTexture => {
   return texture;
 };
 
-// Singleton textures to reuse across all node sprites
-const defaultIconTexture = createTerminalIconTexture('#97958E'); // Neutral gray
-const activeIconTexture = createTerminalIconTexture('#C56A3A');  // Warm orange accent
+// Reusable singletons to save memory and processing overhead
+const defaultIconTexture = createTerminalIconTexture('#8A8780'); // Muted warm-gray
+const activeIconTexture = createTerminalIconTexture('#C56A3A');  // Selected warm-orange
 
 export function NodeIcons() {
   const { camera } = useThree();
@@ -38,7 +37,7 @@ export function NodeIcons() {
   const lastCheckTime = useRef(0);
   const tempV = useMemo(() => new Vector3(), []);
 
-  // Filter nodes if a cluster is isolated
+  // Filter nodes when a cluster is isolated
   const nodes = useMemo(() => {
     if (!graph) return [];
     if (isolatedCluster) {
@@ -50,7 +49,7 @@ export function NodeIcons() {
   useFrame((state) => {
     const now = state.clock.getElapsedTime();
     
-    // Throttle computations to once every 200ms (10 frames) to preserve high FPS
+    // Throttle checks to 200ms to preserve frame rates
     if (now - lastCheckTime.current < 0.2) return;
     lastCheckTime.current = now;
 
@@ -84,7 +83,6 @@ export function NodeIcons() {
     });
 
     // 2. Screen-Space Overlap Prevention
-    // Sort candidates so selected/hovered nodes are evaluated first and claim space
     const sortedCandidates = [...candidates].sort((a, b) => {
       const prioA = (a.id === selectedNode?.id || a.id === hoveredNode?.id) ? 1 : 0;
       const prioB = (b.id === selectedNode?.id || b.id === hoveredNode?.id) ? 1 : 0;
@@ -105,7 +103,6 @@ export function NodeIcons() {
         for (const coord of screenCoordinates) {
           const dx = tempV.x - coord.x;
           const dy = tempV.y - coord.y;
-          // screen space boundaries range from -1 to 1; 0.08 represents around 8% of screen dimension
           if (Math.sqrt(dx * dx + dy * dy) < 0.08) {
             isOverlapping = true;
             break;
@@ -128,21 +125,36 @@ export function NodeIcons() {
         const isHovered = hoveredNode?.id === node.id;
         const isActive = isSelected || isHovered;
 
-        // Size rules based on hover and selection
-        let iconScale = 1.6;
-        if (isHovered) iconScale = 2.4;
-        else if (isSelected) iconScale = 2.1;
-
-        const baseNodeSize = 0.6 + node.centrality * 2.5 + Math.min(node.lineCount / 1000, 1.5);
-        // Position icon slightly above the star node depending on its size scale
-        const yOffset = baseNodeSize * 0.8 + 0.5;
+        // Calculate distance to camera for scale attenuation
         const [x, y, z] = node.position;
+        const dist = camera.position.distanceTo(tempV.set(x, y, z));
+
+        // Distance-aware scaling to keep sprite visual size stable
+        let iconScale = dist * 0.014;
+        iconScale = Math.max(0.7, Math.min(2.8, iconScale));
+
+        if (isHovered) {
+          iconScale *= 1.35;
+        } else if (isSelected) {
+          iconScale *= 1.25;
+        }
+
+        // Calculate node size based on the same logarithmic logic
+        const baseScaleLog = 0.6;
+        const metric = node.lineCount || 0;
+        const scaleFactor = 0.4;
+        let baseNodeSize = baseScaleLog + Math.log1p(metric) * scaleFactor + node.centrality * 1.5;
+        baseNodeSize = Math.max(0.5, Math.min(3.5, baseNodeSize));
+
+        // Offset icon very close to the star core to maintain visual connection
+        const yOffset = baseNodeSize * 0.35 + 0.1;
 
         return (
           <sprite
             key={node.id}
             position={[x, y + yOffset, z]}
             scale={[iconScale, iconScale, 1]}
+            renderOrder={isSelected ? 100 : 0}
           >
             <spriteMaterial
               map={isActive ? activeIconTexture : defaultIconTexture}
