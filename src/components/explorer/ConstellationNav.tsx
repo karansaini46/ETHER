@@ -5,7 +5,7 @@ import { FileList } from './FileList';
 
 export function ConstellationNav() {
   const graph = useExplorerStore((s) => s.graph);
-  const isolatedCluster = useExplorerStore((s) => s.isolatedCluster);
+  const activeConstellationPath = useExplorerStore((s) => s.activeConstellationPath);
   const isolateCluster = useExplorerStore((s) => s.isolateCluster);
 
   const [legendOpen, setLegendOpen] = useState(false);
@@ -51,19 +51,19 @@ export function ConstellationNav() {
         <button
           onClick={() => isolateCluster(null)}
           className={`w-full flex items-center gap-2 p-2 rounded text-left transition-colors border shrink-0 ${
-            !isolatedCluster 
+            !activeConstellationPath 
               ? 'bg-accent-primary/10 border-accent-primary/45 text-primary font-medium' 
               : 'bg-transparent border-transparent hover:bg-surface-secondary text-secondary'
           }`}
         >
-          <Network size={11} className={!isolatedCluster ? 'text-accent-primary' : 'text-secondary/40'} />
+          <Network size={11} className={!activeConstellationPath ? 'text-accent-primary' : 'text-secondary/40'} />
           <span className="truncate text-[10px]">Show All Systems</span>
         </button>
 
         {/* Folder items */}
         <div className="space-y-0.5 mt-2 shrink-0">
           {folders.map((folder) => {
-            const isIsolated = isolatedCluster === folder;
+            const isIsolated = activeConstellationPath === folder;
             return (
               <button
                 key={folder}

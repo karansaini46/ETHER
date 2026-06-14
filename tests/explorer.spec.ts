@@ -127,8 +127,8 @@ test.describe('ETHER 3D Explorer Integration Tests', () => {
     const inspectorFileName = page.locator('text=Button.tsx');
     await expect(inspectorFileName.first()).toBeVisible();
 
-    const inspectorPathName = page.locator('text=demo:src/components/Button.tsx');
-    await expect(inspectorPathName).toBeVisible();
+    const inspectorPathName = page.locator('text=src/components/Button.tsx');
+    await expect(inspectorPathName.first()).toBeVisible();
   });
 
   test('4. Closing the inspector leaves the node selected', async ({ page }) => {

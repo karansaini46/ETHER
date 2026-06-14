@@ -17,25 +17,31 @@ const NODE_COLORS: Record<NodeType, string> = {
 
 const ISSUE_COLOR = '#C6504B'; // Deep red for risk/issues
 
+// Normal node scale helper clamped strictly between 0.45 and 1.6
+export function calculateNodeScale(metric: number): number {
+  const safeMetric = Number.isFinite(metric) ? Math.max(0, metric) : 0;
+  return Math.max(0.45, Math.min(1.6, 0.45 + Math.log1p(safeMetric) * 0.12));
+}
+
 export function StarField() {
   const meshRef = useRef<InstancedMesh>(null);
   
   // Store state and actions
   const graph = useExplorerStore((s) => s.graph);
-  const selectNode = useExplorerStore((s) => s.selectNode);
+  const selectFileByPath = useExplorerStore((s) => s.selectFileByPath);
   const selectedNode = useExplorerStore((s) => s.selectedNode);
   const hoveredNode = useExplorerStore((s) => s.hoveredNode);
   const setHoveredNode = useExplorerStore((s) => s.setHoveredNode);
   const highlightedNodes = useExplorerStore((s) => s.highlightedNodes);
-  const isolatedCluster = useExplorerStore((s) => s.isolatedCluster);
+  const activeConstellationPath = useExplorerStore((s) => s.activeConstellationPath);
 
   const nodes = useMemo(() => {
     if (!graph) return [];
-    if (isolatedCluster) {
-      return graph.nodes.filter((n) => n.folder === isolatedCluster || n.id === isolatedCluster);
+    if (activeConstellationPath) {
+      return graph.nodes.filter((n) => n.constellationPath === activeConstellationPath);
     }
     return graph.nodes;
-  }, [graph, isolatedCluster]);
+  }, [graph, activeConstellationPath]);
 
   const count = nodes.length;
 
@@ -83,8 +89,8 @@ export function StarField() {
     const elapsed = state.clock.getElapsedTime() - lastSelectionTime.current;
     let pulseScale = 1.0;
     if (selectedNode && elapsed < 0.6) {
-      // 600ms one-time pulse scaling up to 1.35x
-      pulseScale = 1.0 + Math.sin((elapsed / 0.6) * Math.PI) * 0.35;
+      // 600ms one-time pulse scaling up to 1.12x (pulseScale: 1.0 -> 1.12 -> 1.0)
+      pulseScale = 1.0 + Math.sin((elapsed / 0.6) * Math.PI) * 0.12;
     }
 
     for (let i = 0; i < count; i++) {
@@ -99,22 +105,19 @@ export function StarField() {
       const isHighlighted = highlightedNodes.has(node.id);
       const isRelated = !selectedNode || relatedNodes.has(node.id);
 
-      // Logarithmic node size calculation
-      const baseScaleLog = 0.6;
-      const metric = node.lineCount || 0;
-      const scaleFactor = 0.4;
-      let visualScale = baseScaleLog + Math.log1p(metric) * scaleFactor + node.centrality * 1.5;
-      
-      // Clamp bounds firmly to prevent massive overlapping cubes/spheres
-      visualScale = Math.max(0.5, Math.min(3.5, visualScale));
+      // Logarithmic node size calculation with bounds
+      const baseScale = calculateNodeScale(node.lineCount);
+      let visualScale = baseScale;
 
-      // Multiply rather than replace scale
       if (isHovered) {
-        visualScale *= 1.25;
+        visualScale = baseScale * 1.1;
       } else if (isSelected) {
-        visualScale *= 1.20 * pulseScale;
+        visualScale = baseScale * 1.15 * pulseScale;
       }
       
+      // Enforce the hard upper bound of 1.9
+      visualScale = Math.min(1.9, visualScale);
+
       dummy.scale.set(visualScale, visualScale, visualScale);
       dummy.updateMatrix();
       mesh.setMatrixAt(i, dummy.matrix);
@@ -188,11 +191,11 @@ export function StarField() {
 
     if (lastClick && lastClick.nodeId === node.id && now - lastClick.time < 350) {
       // Double click -> select and focus camera
-      selectNode(node, { source: 'canvas', focusCamera: true });
+      selectFileByPath(node.displayPath, { source: 'canvas', focusCamera: true });
       lastClickRef.current = null;
     } else {
       // Single click -> select node only
-      selectNode(node, { source: 'canvas', focusCamera: false });
+      selectFileByPath(node.displayPath, { source: 'canvas', focusCamera: false });
       lastClickRef.current = { nodeId: node.id, time: now };
     }
   };

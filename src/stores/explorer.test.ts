@@ -4,6 +4,9 @@ import type { GraphNode, GraphData } from '@/types/graph';
 
 const mockNode: GraphNode = {
   id: 'src/main.tsx',
+  displayPath: 'src/main.tsx',
+  fileName: 'main.tsx',
+  constellationPath: 'src',
   label: 'main',
   type: 'entry',
   folder: 'src',
@@ -43,7 +46,7 @@ describe('explorer Zustand store', () => {
       selectedNodeId: null,
       highlightedNodes: new Set(),
       highlightedEdges: new Set(),
-      isolatedCluster: null,
+      activeConstellationPath: null,
       searchOpen: false,
       isDemo: false,
       inspectorOpen: false,
@@ -60,7 +63,7 @@ describe('explorer Zustand store', () => {
     const state = useExplorerStore.getState();
     expect(state.selectedNode).toBeNull();
     expect(state.selectedNodeId).toBeNull();
-    expect(state.isolatedCluster).toBeNull();
+    expect(state.activeConstellationPath).toBeNull();
     expect(state.searchOpen).toBe(false);
   });
 
@@ -83,7 +86,14 @@ describe('explorer Zustand store', () => {
     const graphData: GraphData = {
       ...mockGraphData,
       nodes: [
-        { ...mockNode, id: 'src/components/Button.tsx', label: 'Button' }
+        { 
+          ...mockNode, 
+          id: 'src/components/Button.tsx', 
+          displayPath: 'src/components/Button.tsx', 
+          fileName: 'Button.tsx', 
+          constellationPath: 'src/components',
+          label: 'Button' 
+        }
       ]
     };
     useExplorerStore.getState().setGraph(graphData);
@@ -100,6 +110,6 @@ describe('explorer Zustand store', () => {
 
   it('should isolate cluster by folder name', () => {
     useExplorerStore.getState().isolateCluster('src/features');
-    expect(useExplorerStore.getState().isolatedCluster).toBe('src/features');
+    expect(useExplorerStore.getState().activeConstellationPath).toBe('src/features');
   });
 });

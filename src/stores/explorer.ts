@@ -29,6 +29,10 @@ export const normalizePath = (p: string): string => {
   return normalized.trim();
 };
 
+export function getDisplayPath(node: GraphNode): string {
+  return node.displayPath;
+}
+
 interface ExplorerState {
   // Repository
   repoUrl: string | null;
@@ -60,7 +64,7 @@ interface ExplorerState {
   previousCameraState: { position: [number, number, number]; target: [number, number, number] } | null;
   highlightedNodes: Set<string>;
   highlightedEdges: Set<string>;
-  isolatedCluster: string | null;
+  activeConstellationPath: string | null;
 
   // Layout Panels
   inspectorOpen: boolean;
@@ -121,7 +125,7 @@ const initialState = {
   previousCameraState: null,
   highlightedNodes: new Set<string>(),
   highlightedEdges: new Set<string>(),
-  isolatedCluster: null,
+  activeConstellationPath: null,
   inspectorOpen: false,
   renderingOpen: false,
   clustersOpen: true,
@@ -152,14 +156,22 @@ export const useExplorerStore = create<ExplorerState>()((set, get) => ({
 
     const currentAnalysisId = state.analysisId || 'demo';
 
-    // Map raw nodes to stable IDs
+    // Map raw nodes to stable IDs and clean fields
     const mappedNodes = graph.nodes.map((node) => {
       const normPath = normalizePath(node.id);
-      const stableId = `${currentAnalysisId}:${normPath}`;
+      const stableId = normPath.startsWith(`${currentAnalysisId}:`)
+        ? normPath
+        : `${currentAnalysisId}:${normPath}`;
+      
+      const displayPath = stableId.substring(currentAnalysisId.length + 1);
       const normFolder = normalizePath(node.folder || '/');
+      const fileName = displayPath.substring(displayPath.lastIndexOf('/') + 1) || displayPath;
       return {
         ...node,
         id: stableId,
+        displayPath: displayPath,
+        fileName: fileName,
+        constellationPath: normFolder,
         folder: normFolder,
       };
     });
@@ -168,10 +180,16 @@ export const useExplorerStore = create<ExplorerState>()((set, get) => ({
     const mappedEdges = graph.edges.map((edge) => {
       const normSource = normalizePath(edge.source);
       const normTarget = normalizePath(edge.target);
+      const stableSource = normSource.startsWith(`${currentAnalysisId}:`)
+        ? normSource
+        : `${currentAnalysisId}:${normSource}`;
+      const stableTarget = normTarget.startsWith(`${currentAnalysisId}:`)
+        ? normTarget
+        : `${currentAnalysisId}:${normTarget}`;
       return {
         ...edge,
-        source: `${currentAnalysisId}:${normSource}`,
-        target: `${currentAnalysisId}:${normTarget}`,
+        source: stableSource,
+        target: stableTarget,
       };
     });
 
@@ -186,11 +204,8 @@ export const useExplorerStore = create<ExplorerState>()((set, get) => ({
     const nodeIdsByConstellationPath = new Map<string, string[]>();
 
     for (const node of mappedNodes) {
-      // Find original normalized path (everything after first colon)
-      const normPath = normalizePath(node.id.substring(currentAnalysisId.length + 1));
-      
       nodeById.set(node.id, node);
-      nodeIdByFullPath.set(normPath, node.id);
+      nodeIdByFullPath.set(node.displayPath, node.id);
 
       const normFolder = node.folder;
       if (!nodeIdsByConstellationPath.has(normFolder)) {
@@ -252,8 +267,8 @@ export const useExplorerStore = create<ExplorerState>()((set, get) => ({
       selectedNodeId: resolvedNode.id,
     };
 
-    if (revealNode && state.isolatedCluster && state.isolatedCluster !== resolvedNode.folder) {
-      updates.isolatedCluster = null; // reset constellation filter
+    if (revealNode && state.activeConstellationPath && state.activeConstellationPath !== resolvedNode.constellationPath) {
+      updates.activeConstellationPath = null; // reset constellation filter
     }
 
     if (openInspector) {
@@ -294,12 +309,19 @@ export const useExplorerStore = create<ExplorerState>()((set, get) => ({
     const norm = normalizePath(fullPath);
     const nodeId = get().nodeIdByFullPath.get(norm);
     if (nodeId) {
-      get().selectNode(nodeId, {
-        revealNode: true,
-        highlightDependencies: true,
-        openInspector: true,
-        ...options,
-      });
+      const node = get().nodeById.get(nodeId);
+      if (node) {
+        if (get().activeConstellationPath && get().activeConstellationPath !== node.constellationPath) {
+          set({ activeConstellationPath: null });
+        }
+        get().selectNode(nodeId, {
+          revealNode: true,
+          highlightDependencies: true,
+          openInspector: options?.openInspector ?? true,
+          focusCamera: options?.focusCamera ?? false,
+          source: options?.source,
+        });
+      }
     } else {
       console.warn(`[DEV WARNING] File path not found in graph: ${norm}`);
       get().setNotification("This file is not available in the current graph.");
@@ -318,7 +340,7 @@ export const useExplorerStore = create<ExplorerState>()((set, get) => ({
   highlightNodes: (ids) => set({ highlightedNodes: new Set(ids) }),
   highlightEdges: (keys) => set({ highlightedEdges: new Set(keys) }),
   clearHighlights: () => set({ highlightedNodes: new Set(), highlightedEdges: new Set() }),
-  isolateCluster: (folder) => set({ isolatedCluster: folder }),
+  isolateCluster: (folder) => set({ activeConstellationPath: folder }),
 
   setInspectorOpen: (open) => set(() => {
     const updates: Partial<ExplorerState> = { inspectorOpen: open };
@@ -368,3 +390,5 @@ export const useExplorerStore = create<ExplorerState>()((set, get) => ({
   
   reset: () => set(initialState),
 }));
+
+export default useExplorerStore;

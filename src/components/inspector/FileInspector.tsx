@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useExplorerStore } from '@/stores/explorer';
+import { useExplorerStore, getDisplayPath } from '@/stores/explorer';
 import { useNavigatorStore } from '@/stores/navigator';
 import { 
   X, 
@@ -30,7 +30,7 @@ export function FileInspector() {
   const repoOwner = useExplorerStore((s) => s.repoOwner);
   const repoName = useExplorerStore((s) => s.repoName);
   const highlightEdges = useExplorerStore((s) => s.highlightEdges);
-  const isolatedCluster = useExplorerStore((s) => s.isolatedCluster);
+  const activeConstellationPath = useExplorerStore((s) => s.activeConstellationPath);
   const isolateCluster = useExplorerStore((s) => s.isolateCluster);
   const openChat = useNavigatorStore((s) => s.openChat);
   const addMessage = useNavigatorStore((s) => s.addMessage);
@@ -75,7 +75,7 @@ export function FileInspector() {
     openChat();
     addMessage({
       role: 'user',
-      content: `Explain the purpose and dependencies of the file: \`${selectedNode.id}\``,
+      content: `Explain the purpose and dependencies of the file: \`${getDisplayPath(selectedNode)}\``,
       timestamp: Date.now(),
     });
   };
@@ -90,7 +90,7 @@ export function FileInspector() {
   // Construct GitHub link
   const defaultBranch = graph?.defaultBranch || 'main';
   const githubUrl = repoOwner && repoName 
-    ? `https://github.com/${repoOwner}/${repoName}/blob/${defaultBranch}/${selectedNode.id}`
+    ? `https://github.com/${repoOwner}/${repoName}/blob/${defaultBranch}/${selectedNode.displayPath}`
     : null;
 
   return (
@@ -126,11 +126,11 @@ export function FileInspector() {
         {/* File Path & Folder */}
         <div>
           <div className="text-[9px] text-secondary/40 uppercase tracking-wider mb-0.5">File Name</div>
-          <div className="text-primary font-bold text-sm mb-1">{selectedNode.label}</div>
+          <div className="text-primary font-bold text-sm mb-1">{selectedNode.fileName}</div>
           
           <div className="text-[9px] text-secondary/40 uppercase tracking-wider mb-0.5">Full Path</div>
           <div className="text-primary break-all leading-relaxed bg-void/30 border border-primary/5 p-1.5 rounded text-[10px] select-all">
-            {selectedNode.id}
+            {getDisplayPath(selectedNode)}
           </div>
         </div>
 
@@ -139,7 +139,7 @@ export function FileInspector() {
             <div className="text-[8px] text-secondary/40 tracking-wider">CONSTELLATION</div>
             <div className="text-primary font-medium truncate flex items-center gap-1 mt-0.5">
               <Folder size={10} className="text-accent-secondary shrink-0" />
-              <span>{selectedNode.folder === '/' ? 'root' : selectedNode.folder}</span>
+              <span>{selectedNode.constellationPath === '/' ? 'root' : selectedNode.constellationPath}</span>
             </div>
           </div>
           <div className="bg-void/40 border border-primary/5 rounded p-2">
@@ -247,9 +247,10 @@ export function FileInspector() {
                 <button
                   key={imp.id}
                   onClick={() => selectNode(imp, { source: 'dependency-list', focusCamera: true })}
+                  title={imp.displayPath}
                   className="w-full text-left truncate py-0.5 hover:text-accent-selected text-secondary/80 transition-colors block text-[9px]"
                 >
-                  &gt; {imp.label}
+                  &gt; {imp.fileName}
                 </button>
               ))}
             </div>
@@ -270,9 +271,10 @@ export function FileInspector() {
                 <button
                   key={imp.id}
                   onClick={() => selectNode(imp, { source: 'dependency-list', focusCamera: true })}
+                  title={imp.displayPath}
                   className="w-full text-left truncate py-0.5 hover:text-accent-selected text-secondary/80 transition-colors block text-[9px]"
                 >
-                  &gt; {imp.label}
+                  &gt; {imp.fileName}
                 </button>
               ))}
             </div>
@@ -315,15 +317,15 @@ export function FileInspector() {
 
           <div className="flex gap-2">
             <button
-              onClick={() => isolateCluster(isolatedCluster === selectedNode.folder ? null : selectedNode.folder)}
+              onClick={() => isolateCluster(activeConstellationPath === selectedNode.constellationPath ? null : selectedNode.constellationPath)}
               className={`flex-1 flex items-center justify-center gap-1 py-2 border rounded text-[9px] font-medium tracking-wider uppercase transition-colors ${
-                isolatedCluster === selectedNode.folder
+                activeConstellationPath === selectedNode.constellationPath
                   ? 'bg-accent-selected/10 border-accent-selected/40 text-primary'
                   : 'bg-surface-secondary hover:bg-surface-secondary/80 border border-primary/10 text-primary'
               }`}
             >
               <Layers size={11} className="text-accent-selected" />
-              {isolatedCluster === selectedNode.folder ? 'De-Isolate' : 'Isolate System'}
+              {activeConstellationPath === selectedNode.constellationPath ? 'De-Isolate' : 'Isolate System'}
             </button>
 
             {githubUrl && (

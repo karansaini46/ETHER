@@ -8,7 +8,7 @@ export function SearchCommand() {
   const searchOpen = useExplorerStore((s) => s.searchOpen);
   const setSearchOpen = useExplorerStore((s) => s.setSearchOpen);
   const graph = useExplorerStore((s) => s.graph);
-  const selectNode = useExplorerStore((s) => s.selectNode);
+  const selectFileByPath = useExplorerStore((s) => s.selectFileByPath);
   const query = useExplorerStore((s) => s.searchQuery);
   const setQuery = useExplorerStore((s) => s.setSearchQuery);
 
@@ -61,7 +61,7 @@ export function SearchCommand() {
     if (!graph || !query.trim()) return [];
     const lower = query.toLowerCase();
     return graph.nodes
-      .filter((n) => n.id.toLowerCase().includes(lower) || n.label.toLowerCase().includes(lower))
+      .filter((n) => n.displayPath.toLowerCase().includes(lower) || n.fileName.toLowerCase().includes(lower))
       .slice(0, 10);
   }, [graph, query]);
 
@@ -80,7 +80,7 @@ export function SearchCommand() {
   if (!searchOpen) return null;
 
   const handleSelect = (node: GraphNode) => {
-    selectNode(node, { source: 'search', focusCamera: true });
+    selectFileByPath(node.displayPath, { source: 'search', focusCamera: true });
     setSearchOpen(false);
   };
 
@@ -104,7 +104,7 @@ export function SearchCommand() {
 
   // String message for screen reader announcements
   const announcementText = matches.length > 0 && matches[activeIndex]
-    ? `Result ${activeIndex + 1} of ${matches.length}: ${matches[activeIndex].label}, ${matches[activeIndex].language}`
+    ? `Result ${activeIndex + 1} of ${matches.length}: ${matches[activeIndex].fileName}, ${matches[activeIndex].language}`
     : 'No matches';
 
   return (
@@ -181,9 +181,9 @@ export function SearchCommand() {
                   <div className="truncate pr-3">
                     <div className="font-semibold flex items-center gap-1">
                       <Terminal size={10} className={isActive ? 'text-accent-primary' : 'text-secondary/40'} />
-                      <span className="truncate">{node.label}</span>
+                      <span className="truncate">{node.fileName}</span>
                     </div>
-                    <div className="text-[9px] text-secondary/40 truncate mt-0.5">{node.id}</div>
+                    <div className="text-[9px] text-secondary/40 truncate mt-0.5">{node.displayPath}</div>
                   </div>
                   <div className="text-[8.5px] uppercase px-1.5 py-0.5 bg-surface-secondary border border-primary/5 rounded shrink-0">
                     {node.language || 'Unknown'}

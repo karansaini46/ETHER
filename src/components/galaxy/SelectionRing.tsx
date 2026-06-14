@@ -2,6 +2,7 @@ import { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Mesh } from 'three';
 import { useExplorerStore } from '@/stores/explorer';
+import { calculateNodeScale } from './StarField';
 
 export function SelectionRing() {
   const selectedNode = useExplorerStore((s) => s.selectedNode);
@@ -25,18 +26,19 @@ export function SelectionRing() {
         const elapsed = state.clock.getElapsedTime() - lastSelectionTime.current;
         let pulseScale = 1.0;
         if (elapsed < 0.6) {
-          pulseScale = 1.0 + Math.sin((elapsed / 0.6) * Math.PI) * 0.35;
+          // 600ms one-time pulse scaling up to 1.12x (pulseScale: 1.0 -> 1.12 -> 1.0)
+          pulseScale = 1.0 + Math.sin((elapsed / 0.6) * Math.PI) * 0.12;
         }
 
-        // Base logarithmic scale
-        const baseScaleLog = 0.6;
-        const metric = selectedNode.lineCount || 0;
-        const scaleFactor = 0.4;
-        let visualScale = baseScaleLog + Math.log1p(metric) * scaleFactor + selectedNode.centrality * 1.5;
-        visualScale = Math.max(0.5, Math.min(3.5, visualScale));
+        const baseScale = calculateNodeScale(selectedNode.lineCount);
+        let finalNodeRadius = baseScale * 1.15 * pulseScale;
+        finalNodeRadius = Math.min(1.9, finalNodeRadius);
 
-        const ringScale = visualScale * 1.35 * pulseScale;
-        meshRef.current.scale.set(ringScale, ringScale, ringScale);
+        let ringRadius = finalNodeRadius * 1.55;
+        // Clamp ring radius between 0.8 and 2.5
+        ringRadius = Math.max(0.8, Math.min(2.5, ringRadius));
+
+        meshRef.current.scale.set(ringRadius, ringRadius, ringRadius);
       }
     }
   });
@@ -47,8 +49,8 @@ export function SelectionRing() {
 
   return (
     <mesh ref={meshRef} position={[x, y, z]}>
-      {/* Set base unit radius to 1 so scale handles dimensions exactly */}
-      <torusGeometry args={[1, 0.04, 8, 32]} />
+      {/* Set base unit radius to 1 so scale handles dimensions exactly, thin ring tube */}
+      <torusGeometry args={[1, 0.015, 8, 32]} />
       <meshBasicMaterial color="#C56A3A" wireframe />
     </mesh>
   );

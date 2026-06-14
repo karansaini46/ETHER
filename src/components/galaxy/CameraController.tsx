@@ -4,6 +4,7 @@ import { Vector3 } from 'three';
 import { OrbitControls } from '@react-three/drei';
 import { useExplorerStore } from '@/stores/explorer';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
+import { calculateNodeScale } from './StarField';
 
 export function CameraController() {
   const { camera } = useThree();
@@ -17,7 +18,7 @@ export function CameraController() {
   const previousCameraState = useExplorerStore((s) => s.previousCameraState);
   const setPreviousCameraState = useExplorerStore((s) => s.setPreviousCameraState);
   const setSearchOpen = useExplorerStore((s) => s.setSearchOpen);
-  const isolatedCluster = useExplorerStore((s) => s.isolatedCluster);
+  const activeConstellationPath = useExplorerStore((s) => s.activeConstellationPath);
   const graph = useExplorerStore((s) => s.graph);
   
   const inspectorOpen = useExplorerStore((s) => s.inspectorOpen);
@@ -69,14 +70,10 @@ export function CameraController() {
         setPreviousCameraState({ position: currentPos, target: currentTgt });
       }
 
-      // Logarithmic scale size calculation matching StarField
-      const baseScaleLog = 0.6;
-      const metric = focusedNode.lineCount || 0;
-      const scaleFactor = 0.4;
-      let visualScale = baseScaleLog + Math.log1p(metric) * scaleFactor + focusedNode.centrality * 1.5;
-      visualScale = Math.max(0.5, Math.min(3.5, visualScale));
-
-      const focusDist = visualScale * 6 + 12;
+      // Clamped visual scaling to decide focus distance
+      const baseScale = calculateNodeScale(focusedNode.lineCount);
+      const finalNodeRadius = Math.min(1.9, baseScale * 1.15);
+      const focusDist = Math.max(7, Math.min(16, finalNodeRadius * 7));
 
       // Position back along current camera facing direction
       const dir = new Vector3();
@@ -112,7 +109,7 @@ export function CameraController() {
         .addScaledVector(camUp, -worldShiftY);
 
       isTransitioning.current = true;
-    } else if (!isolatedCluster) {
+    } else if (!activeConstellationPath) {
       // Return smoothly to previous state if cleared
       if (previousCameraState) {
         const [px, py, pz] = previousCameraState.position;
@@ -127,13 +124,9 @@ export function CameraController() {
   // Handle panel updates to recalculate offsets dynamically
   useEffect(() => {
     if (focusedNode) {
-      const baseScaleLog = 0.6;
-      const metric = focusedNode.lineCount || 0;
-      const scaleFactor = 0.4;
-      let visualScale = baseScaleLog + Math.log1p(metric) * scaleFactor + focusedNode.centrality * 1.5;
-      visualScale = Math.max(0.5, Math.min(3.5, visualScale));
-
-      const focusDist = visualScale * 6 + 12;
+      const baseScale = calculateNodeScale(focusedNode.lineCount);
+      const finalNodeRadius = Math.min(1.9, baseScale * 1.15);
+      const focusDist = Math.max(7, Math.min(16, finalNodeRadius * 7));
 
       const dir = new Vector3();
       camera.getWorldDirection(dir);
@@ -170,10 +163,10 @@ export function CameraController() {
     }
   }, [clustersOpen, inspectorOpen, selectedNode]);
 
-  // Handle isolatedCluster changes to zoom/pan to fit the constellation system
+  // Handle activeConstellationPath changes to zoom/pan to fit the constellation system
   useEffect(() => {
-    if (isolatedCluster && graph) {
-      const clusterNodes = graph.nodes.filter((n) => n.folder === isolatedCluster);
+    if (activeConstellationPath && graph) {
+      const clusterNodes = graph.nodes.filter((n) => n.constellationPath === activeConstellationPath);
       if (clusterNodes.length > 0) {
         if (controlsRef.current && !previousCameraState) {
           const currentPos: [number, number, number] = [camera.position.x, camera.position.y, camera.position.z];
@@ -242,7 +235,7 @@ export function CameraController() {
 
         isTransitioning.current = true;
       }
-    } else if (!isolatedCluster && !focusedNode) {
+    } else if (!activeConstellationPath && !focusedNode) {
       if (previousCameraState) {
         const [px, py, pz] = previousCameraState.position;
         const [tx, ty, tz] = previousCameraState.target;
@@ -251,7 +244,7 @@ export function CameraController() {
         isTransitioning.current = true;
       }
     }
-  }, [isolatedCluster, graph]);
+  }, [activeConstellationPath, graph]);
 
   // Keyboard shortcuts
   useKeyboardShortcuts([
@@ -317,7 +310,7 @@ export function CameraController() {
 
         if (posReached && tgtReached) {
           isTransitioning.current = false;
-          if (!focusedNode && !isolatedCluster) {
+          if (!focusedNode && !activeConstellationPath) {
             setPreviousCameraState(null);
           }
         }

@@ -123,10 +123,12 @@ export function DependencyLines() {
         highlightedEdges.has(`${edge.source}\0${edge.target}`) ||
         highlightedEdges.has(`${edge.target}\0${edge.source}`);
 
-      if (isActive || isAIHighlighted) {
-        opacityFactor = 0.90; // High selected edge opacity
+      if (isActive) {
+        opacityFactor = 0.75; // Selected edge opacity
+      } else if (isAIHighlighted) {
+        opacityFactor = 0.42; // Related edge opacity
       } else if (selectedNode) {
-        opacityFactor = 0.06; // Dim unrelated edges but keep them faintly visible
+        opacityFactor = 0.035; // Dim unrelated edges but keep them faintly visible
       }
 
       posList.push(sx, sy, sz, tx, ty, tz);

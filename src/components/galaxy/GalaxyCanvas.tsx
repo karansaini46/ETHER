@@ -70,8 +70,8 @@ export function GalaxyCanvas() {
               distanceFactor={35} // Dynamic text scaling based on camera distance
             >
               <div className="galaxy-node-label pointer-events-none select-none shadow-technical text-left min-w-[150px]">
-                <div className="font-bold text-accent-primary text-[10px] truncate">{hoveredNode.label}</div>
-                <div className="text-secondary/75 text-[8px] mt-0.5 truncate max-w-[220px]">{hoveredNode.id}</div>
+                <div className="font-bold text-accent-primary text-[10px] truncate">{hoveredNode.fileName}</div>
+                <div className="text-secondary/75 text-[8px] mt-0.5 truncate max-w-[220px]">{hoveredNode.displayPath}</div>
               </div>
             </Html>
           )}

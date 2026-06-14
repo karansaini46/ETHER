@@ -6,25 +6,37 @@ export function FileList() {
   const graph = useExplorerStore((s) => s.graph);
   const selectedNode = useExplorerStore((s) => s.selectedNode);
   const selectFileByPath = useExplorerStore((s) => s.selectFileByPath);
-  const isolatedCluster = useExplorerStore((s) => s.isolatedCluster);
+  const activeConstellationPath = useExplorerStore((s) => s.activeConstellationPath);
 
   const listRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
 
   // Filter and sort the files within the currently active system/cluster
   const files = useMemo(() => {
-    if (!graph) return [];
-    const list = isolatedCluster
-      ? graph.nodes.filter((n) => n.folder === isolatedCluster || n.id === isolatedCluster)
-      : graph.nodes;
+    if (!graph || !activeConstellationPath) return [];
+    const list = graph.nodes.filter((n) => n.constellationPath === activeConstellationPath);
 
     return [...list].sort((a, b) => {
-      if (a.folder !== b.folder) {
-        return a.folder.localeCompare(b.folder);
-      }
-      return a.label.localeCompare(b.label);
+      return a.fileName.localeCompare(b.fileName);
     });
-  }, [graph, isolatedCluster]);
+  }, [graph, activeConstellationPath]);
+
+  // Compute duplicate display helpers
+  const fileDisplayData = useMemo(() => {
+    const nameCounts = new Map<string, number>();
+    for (const f of files) {
+      nameCounts.set(f.fileName, (nameCounts.get(f.fileName) || 0) + 1);
+    }
+
+    return files.map((f) => {
+      const isDuplicate = (nameCounts.get(f.fileName) || 0) > 1;
+      return {
+        node: f,
+        displayName: f.fileName,
+        extraPath: isDuplicate ? f.displayPath : null,
+      };
+    });
+  }, [files]);
 
   // Automatically scroll selected node into view without stealing browser focus
   useEffect(() => {
@@ -51,14 +63,14 @@ export function FileList() {
       (items[prevIndex] as HTMLElement).focus();
     } else if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
-      const node = files[index];
-      if (node) {
-        selectFileByPath(node.id, { source: 'sidebar', focusCamera: true });
+      const item = fileDisplayData[index];
+      if (item) {
+        selectFileByPath(item.node.displayPath, { source: 'sidebar', focusCamera: true });
       }
     }
   };
 
-  if (files.length === 0) return null;
+  if (!activeConstellationPath || files.length === 0) return null;
 
   return (
     <div className="mt-4 border-t border-primary/5 pt-4 flex-1 flex flex-col min-h-0">
@@ -73,26 +85,26 @@ export function FileList() {
         aria-label="Constellation files keyboard navigation panel"
         className="space-y-0.5 overflow-y-auto border border-primary/5 rounded p-1 bg-void/30 outline-none focus-within:border-accent-primary/20 flex-1 min-h-0 hud-scrollbar"
       >
-        {files.map((node, index) => {
-          const isSelected = selectedNode?.id === node.id;
+        {fileDisplayData.map((item, index) => {
+          const isSelected = selectedNode?.id === item.node.id;
           return (
             <button
-              key={node.id}
+              key={item.node.id}
               ref={(el) => {
                 if (el) {
-                  itemRefs.current.set(node.id, el);
+                  itemRefs.current.set(item.node.id, el);
                 } else {
-                  itemRefs.current.delete(node.id);
+                  itemRefs.current.delete(item.node.id);
                 }
               }}
               type="button"
               role="option"
               aria-selected={isSelected}
-              title={node.id}
+              title={item.node.displayPath}
               tabIndex={0}
               onKeyDown={(e) => handleKeyDown(e, index)}
               onClick={() => {
-                selectFileByPath(node.id, { source: 'sidebar', focusCamera: true });
+                selectFileByPath(item.node.displayPath, { source: 'sidebar', focusCamera: true });
               }}
               className={`w-full flex items-center gap-2 p-1.5 rounded text-left cursor-pointer transition-all outline-none focus:bg-accent-primary/5 focus:text-primary border-0 bg-transparent ${
                 isSelected
@@ -104,7 +116,14 @@ export function FileList() {
                 size={9}
                 className={isSelected ? 'text-accent-primary shrink-0' : 'text-secondary/30 shrink-0'}
               />
-              <span className="truncate text-[9.5px] font-mono">{node.label}</span>
+              <span className="truncate text-[9.5px] font-mono flex items-center justify-between w-full">
+                <span className="truncate font-semibold">{item.displayName}</span>
+                {item.extraPath && (
+                  <span className="text-[8px] text-secondary/40 ml-2 truncate shrink">
+                    ({item.extraPath})
+                  </span>
+                )}
+              </span>
             </button>
           );
         })}

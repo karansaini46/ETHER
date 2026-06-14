@@ -1,50 +1,69 @@
 import { useRef, useMemo, useState } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
-import { CanvasTexture, Vector3 } from 'three';
+import * as THREE from 'three';
 import { useExplorerStore } from '@/stores/explorer';
 import type { GraphNode } from '@/types/graph';
+import { calculateNodeScale } from './StarField';
 
 // Canvas-based textures for upright camera-facing terminal glyphs ">_"
-const createTerminalIconTexture = (colorStr: string): CanvasTexture => {
+const createTerminalIconTexture = (colorStr: string): THREE.CanvasTexture => {
   const canvas = document.createElement('canvas');
-  canvas.width = 64;
-  canvas.height = 64;
-  const ctx = canvas.getContext('2d');
+  canvas.width = 128;
+  canvas.height = 128;
+  const ctx = canvas.getContext('2d', { alpha: true });
   if (ctx) {
-    ctx.clearRect(0, 0, 64, 64);
-    ctx.font = 'bold 36px monospace';
+    ctx.clearRect(0, 0, 128, 128);
+    ctx.font = '600 52px monospace';
     ctx.fillStyle = colorStr;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('>_', 32, 32);
+    ctx.fillText('>_', 64, 64);
   }
-  const texture = new CanvasTexture(canvas);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.needsUpdate = true;
+  texture.colorSpace = THREE.SRGBColorSpace;
   return texture;
 };
 
 // Reusable singletons to save memory and processing overhead
-const defaultIconTexture = createTerminalIconTexture('#8A8780'); // Muted warm-gray
+const defaultIconTexture = createTerminalIconTexture('#ded8cc'); // Muted warm-white/gray
 const activeIconTexture = createTerminalIconTexture('#C56A3A');  // Selected warm-orange
+
+const defaultMaterial = new THREE.SpriteMaterial({
+  map: defaultIconTexture,
+  transparent: true,
+  alphaTest: 0.05,
+  depthWrite: false,
+  toneMapped: false,
+});
+
+const activeMaterial = new THREE.SpriteMaterial({
+  map: activeIconTexture,
+  transparent: true,
+  alphaTest: 0.05,
+  depthWrite: false,
+  toneMapped: false,
+});
 
 export function NodeIcons() {
   const { camera } = useThree();
   const graph = useExplorerStore((s) => s.graph);
   const selectedNode = useExplorerStore((s) => s.selectedNode);
   const hoveredNode = useExplorerStore((s) => s.hoveredNode);
-  const isolatedCluster = useExplorerStore((s) => s.isolatedCluster);
+  const activeConstellationPath = useExplorerStore((s) => s.activeConstellationPath);
 
   const [visibleNodes, setVisibleNodes] = useState<GraphNode[]>([]);
   const lastCheckTime = useRef(0);
-  const tempV = useMemo(() => new Vector3(), []);
+  const tempV = useMemo(() => new THREE.Vector3(), []);
 
   // Filter nodes when a cluster is isolated
   const nodes = useMemo(() => {
     if (!graph) return [];
-    if (isolatedCluster) {
-      return graph.nodes.filter((n) => n.folder === isolatedCluster || n.id === isolatedCluster);
+    if (activeConstellationPath) {
+      return graph.nodes.filter((n) => n.constellationPath === activeConstellationPath);
     }
     return graph.nodes;
-  }, [graph, isolatedCluster]);
+  }, [graph, activeConstellationPath]);
 
   useFrame((state) => {
     const now = state.clock.getElapsedTime();
@@ -134,17 +153,13 @@ export function NodeIcons() {
         iconScale = Math.max(0.7, Math.min(2.8, iconScale));
 
         if (isHovered) {
-          iconScale *= 1.35;
+          iconScale *= 1.1; // 1.1x size on hover
         } else if (isSelected) {
-          iconScale *= 1.25;
+          iconScale *= 1.15; // 1.15x size on select
         }
 
         // Calculate node size based on the same logarithmic logic
-        const baseScaleLog = 0.6;
-        const metric = node.lineCount || 0;
-        const scaleFactor = 0.4;
-        let baseNodeSize = baseScaleLog + Math.log1p(metric) * scaleFactor + node.centrality * 1.5;
-        baseNodeSize = Math.max(0.5, Math.min(3.5, baseNodeSize));
+        const baseNodeSize = calculateNodeScale(node.lineCount);
 
         // Offset icon very close to the star core to maintain visual connection
         const yOffset = baseNodeSize * 0.35 + 0.1;
@@ -155,14 +170,8 @@ export function NodeIcons() {
             position={[x, y + yOffset, z]}
             scale={[iconScale, iconScale, 1]}
             renderOrder={isSelected ? 100 : 0}
-          >
-            <spriteMaterial
-              map={isActive ? activeIconTexture : defaultIconTexture}
-              transparent
-              depthWrite={false}
-              depthTest={true}
-            />
-          </sprite>
+            material={isActive ? activeMaterial : defaultMaterial}
+          />
         );
       })}
     </group>
