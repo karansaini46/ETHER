@@ -6,8 +6,11 @@ import { MessageSquare, Send, X, ArrowUpRight, Terminal } from 'lucide-react';
 import type { ChatMessage, NavigatorAction } from '@/types/navigator';
 
 export function NavigatorPanel() {
-  const chatOpen = useNavigatorStore((s) => s.chatOpen);
-  const toggleChat = useNavigatorStore((s) => s.toggleChat);
+  const isNavigatorOpen = useExplorerStore((s) => s.isNavigatorOpen);
+  const closeNavigator = useExplorerStore((s) => s.closeNavigator);
+  const toggleNavigator = useExplorerStore((s) => s.toggleNavigator);
+  const searchOpen = useExplorerStore((s) => s.searchOpen);
+
   const chatHistory = useNavigatorStore((s) => s.chatHistory);
   const addMessage = useNavigatorStore((s) => s.addMessage);
   const isLoading = useNavigatorStore((s) => s.isLoading);
@@ -38,12 +41,24 @@ export function NavigatorPanel() {
     checkAI();
   }, [setAIAvailable]);
 
+  // Escape key handler to close the navigator panel
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isNavigatorOpen && !searchOpen) {
+        e.preventDefault();
+        closeNavigator();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isNavigatorOpen, searchOpen, closeNavigator]);
+
   // Scroll chat messages to bottom
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [chatHistory, chatOpen]);
+  }, [chatHistory, isNavigatorOpen]);
 
   // Execute AI action targets inside 3D space
   const executeAction = (action: NavigatorAction) => {
@@ -139,11 +154,11 @@ export function NavigatorPanel() {
     }
   };
 
-  if (!chatOpen) {
+  if (!isNavigatorOpen) {
     return (
-      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 pointer-events-auto">
+      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-bottom-sheets pointer-events-auto">
         <button
-          onClick={toggleChat}
+          onClick={toggleNavigator}
           className="flex items-center gap-2 px-5 py-2.5 bg-accent-primary/10 hover:bg-accent-primary/20 border border-accent-primary/40 text-primary rounded font-mono text-xs tracking-wider transition-colors"
         >
           <MessageSquare size={13} className="text-accent-primary" />
@@ -154,7 +169,7 @@ export function NavigatorPanel() {
   }
 
   return (
-    <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 w-full max-w-xl px-4 pointer-events-auto animate-slide-up">
+    <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-bottom-sheets w-full max-w-xl px-4 pointer-events-auto animate-slide-up">
       <div className="technical-panel rounded shadow-technical p-4 font-mono text-xs text-secondary bg-surface-raised/95">
         <div className="flex justify-between items-center border-b border-primary/5 pb-2 mb-3">
           <div className="flex items-center gap-1.5 text-accent-secondary font-medium tracking-wider">
@@ -162,10 +177,16 @@ export function NavigatorPanel() {
             <span>AI SPATIAL NAVIGATOR</span>
           </div>
           <button
-            onClick={toggleChat}
-            className="text-secondary/60 hover:text-primary transition-colors"
+            type="button"
+            aria-label="Close AI Navigator"
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              closeNavigator();
+            }}
+            className="text-secondary/60 hover:text-primary transition-colors pointer-events-auto h-9 w-9 flex items-center justify-center relative z-30"
           >
-            <X size={14} />
+            <X size={14} aria-hidden="true" />
           </button>
         </div>
 
@@ -240,5 +261,5 @@ export function NavigatorPanel() {
     </div>
   );
 }
-export default NavigatorPanel;
 
+export default NavigatorPanel;

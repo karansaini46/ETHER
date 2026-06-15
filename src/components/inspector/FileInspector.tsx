@@ -32,7 +32,7 @@ export function FileInspector() {
   const highlightEdges = useExplorerStore((s) => s.highlightEdges);
   const activeConstellationPath = useExplorerStore((s) => s.activeConstellationPath);
   const isolateCluster = useExplorerStore((s) => s.isolateCluster);
-  const openChat = useNavigatorStore((s) => s.openChat);
+  const openNavigator = useExplorerStore((s) => s.openNavigator);
   const addMessage = useNavigatorStore((s) => s.addMessage);
 
   const nodeById = useExplorerStore((s) => s.nodeById);
@@ -72,7 +72,7 @@ export function FileInspector() {
   };
 
   const handleAskAI = () => {
-    openChat();
+    openNavigator();
     addMessage({
       role: 'user',
       content: `Explain the purpose and dependencies of the file: \`${getDisplayPath(selectedNode)}\``,

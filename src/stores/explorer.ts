@@ -78,6 +78,9 @@ interface ExplorerState {
   // Non-blocking notification
   notification: string | null;
 
+  // AI Navigator state
+  isNavigatorOpen: boolean;
+
   // Actions
   setRepoUrl: (url: string | null) => void;
   setRepoInfo: (owner: string, name: string) => void;
@@ -100,6 +103,9 @@ interface ExplorerState {
   setSearchQuery: (query: string) => void;
   setSearchOpen: (open: boolean) => void;
   setNotification: (msg: string | null) => void;
+  openNavigator: () => void;
+  closeNavigator: () => void;
+  toggleNavigator: () => void;
   reset: () => void;
 }
 
@@ -132,6 +138,7 @@ const initialState = {
   searchQuery: '',
   searchOpen: false,
   notification: null,
+  isNavigatorOpen: false,
 };
 
 export const useExplorerStore = create<ExplorerState>()((set, get) => ({
@@ -253,7 +260,12 @@ export const useExplorerStore = create<ExplorerState>()((set, get) => ({
 
     if (!resolvedNode) {
       console.warn(`[ETHER] Unresolved node identifier: ${nodeIdOrNode}`);
-      return {};
+      setTimeout(() => {
+        get().setNotification(null);
+      }, 4000);
+      return {
+        notification: "This file is not available in the current graph."
+      };
     }
 
     const w = typeof window !== 'undefined' ? window.innerWidth : 1200;
@@ -387,6 +399,9 @@ export const useExplorerStore = create<ExplorerState>()((set, get) => ({
   setSearchQuery: (query) => set({ searchQuery: query }),
   setSearchOpen: (open) => set({ searchOpen: open }),
   setNotification: (msg) => set({ notification: msg }),
+  openNavigator: () => set({ isNavigatorOpen: true }),
+  closeNavigator: () => set({ isNavigatorOpen: false }),
+  toggleNavigator: () => set((s) => ({ isNavigatorOpen: !s.isNavigatorOpen })),
   
   reset: () => set(initialState),
 }));

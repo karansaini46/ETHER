@@ -59,6 +59,17 @@ export function CameraController() {
   // Handle focusedNode changes for camera flight
   useEffect(() => {
     if (focusedNode) {
+      const pos = focusedNode.position;
+      if (
+        !pos ||
+        pos.length !== 3 ||
+        !pos.every((val) => typeof val === 'number' && Number.isFinite(val)) ||
+        (pos[0] === 0 && pos[1] === 0 && pos[2] === 0)
+      ) {
+        console.warn(`[CameraController] Invalid node position:`, pos);
+        return;
+      }
+
       // Save current state as previous view before transitioning to the new focused node
       if (controlsRef.current && !previousCameraState) {
         const currentPos: [number, number, number] = [camera.position.x, camera.position.y, camera.position.z];
@@ -124,6 +135,16 @@ export function CameraController() {
   // Handle panel updates to recalculate offsets dynamically
   useEffect(() => {
     if (focusedNode) {
+      const pos = focusedNode.position;
+      if (
+        !pos ||
+        pos.length !== 3 ||
+        !pos.every((val) => typeof val === 'number' && Number.isFinite(val)) ||
+        (pos[0] === 0 && pos[1] === 0 && pos[2] === 0)
+      ) {
+        return;
+      }
+
       const baseScale = calculateNodeScale(focusedNode.lineCount);
       const finalNodeRadius = Math.min(1.9, baseScale * 1.15);
       const focusDist = Math.max(7, Math.min(16, finalNodeRadius * 7));

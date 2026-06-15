@@ -38,10 +38,15 @@ export function StarField() {
   const nodes = useMemo(() => {
     if (!graph) return [];
     if (activeConstellationPath) {
-      return graph.nodes.filter((n) => (n.constellationPath || n.folder) === activeConstellationPath);
+      const filtered = graph.nodes.filter((n) => (n.constellationPath || n.folder) === activeConstellationPath);
+      if (selectedNode && !filtered.some((n) => n.id === selectedNode.id)) {
+        const found = graph.nodes.find((n) => n.id === selectedNode.id);
+        if (found) filtered.push(found);
+      }
+      return filtered;
     }
     return graph.nodes;
-  }, [graph, activeConstellationPath]);
+  }, [graph, activeConstellationPath, selectedNode]);
 
   const count = nodes.length;
 

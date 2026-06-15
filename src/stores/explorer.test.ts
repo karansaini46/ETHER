@@ -56,6 +56,7 @@ describe('explorer Zustand store', () => {
       nodeIdByFullPath: new Map(),
       nodeIdsByConstellationPath: new Map(),
       notification: null,
+      isNavigatorOpen: false,
     });
   });
 
@@ -111,5 +112,21 @@ describe('explorer Zustand store', () => {
   it('should isolate cluster by folder name', () => {
     useExplorerStore.getState().isolateCluster('src/features');
     expect(useExplorerStore.getState().activeConstellationPath).toBe('src/features');
+  });
+
+  it('should toggle, open, and close the navigator', () => {
+    expect(useExplorerStore.getState().isNavigatorOpen).toBe(false);
+
+    useExplorerStore.getState().openNavigator();
+    expect(useExplorerStore.getState().isNavigatorOpen).toBe(true);
+
+    useExplorerStore.getState().closeNavigator();
+    expect(useExplorerStore.getState().isNavigatorOpen).toBe(false);
+
+    useExplorerStore.getState().toggleNavigator();
+    expect(useExplorerStore.getState().isNavigatorOpen).toBe(true);
+
+    useExplorerStore.getState().toggleNavigator();
+    expect(useExplorerStore.getState().isNavigatorOpen).toBe(false);
   });
 });

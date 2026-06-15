@@ -69,7 +69,13 @@ export function FileList() {
       e.preventDefault();
       const item = fileDisplayData[index];
       if (item) {
-        selectFileByPath(item.node.displayPath || item.node.id, { source: 'sidebar', focusCamera: true });
+        selectFileByPath(item.node.displayPath || item.node.id, {
+          source: 'sidebar',
+          revealNode: true,
+          focusCamera: true,
+          openInspector: true,
+          highlightDependencies: true,
+        });
       }
     }
   };
@@ -108,7 +114,13 @@ export function FileList() {
               tabIndex={0}
               onKeyDown={(e) => handleKeyDown(e, index)}
               onClick={() => {
-                selectFileByPath(item.node.displayPath || item.node.id, { source: 'sidebar', focusCamera: true });
+                selectFileByPath(item.node.displayPath || item.node.id, {
+                  source: 'sidebar',
+                  revealNode: true,
+                  focusCamera: true,
+                  openInspector: true,
+                  highlightDependencies: true,
+                });
               }}
               className={`w-full flex items-center gap-2 p-1.5 rounded text-left cursor-pointer transition-all outline-none focus:bg-accent-primary/5 focus:text-primary border-0 bg-transparent ${
                 isSelected
